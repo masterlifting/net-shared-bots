@@ -7,12 +7,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\..\..\Submodules\Net.Shared.Extensions\src\Net.Shared.Extensions\Net.Shared.Extensions.csproj" />
-    <ProjectReference Include="..\..\Net.Shared.Bots.Abstractions\Net.Shared.Bots.Abstractions.csproj" />
+    <PackageReference Include="Telegram.Bot" Version="19.0.0" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Telegram.Bot" Version="19.0.0" />
+    <ProjectReference Include="..\..\..\shared-extensions\src\Net.Shared.Extensions\Net.Shared.Extensions.csproj" />
+    <ProjectReference Include="..\Net.Shared.Bots.Abstractions\Net.Shared.Bots.Abstractions.csproj" />
   </ItemGroup>
 
 </Project>
