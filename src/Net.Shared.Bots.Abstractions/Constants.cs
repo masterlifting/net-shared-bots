@@ -14,4 +14,14 @@ public static class Constants
         Voice,
         Sticker
     }
+
+    public static class Telegram
+    {
+        public enum ButtonStyle
+        {
+            VerticallyStrict,
+            VerticallyFlex,
+            Horizontally
+        }
+    }
 }

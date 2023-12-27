@@ -7,9 +7,31 @@ namespace Net.Shared.Bots;
 
 public static class Registrations
 {
-    public static void AddTelegramBot<T>(this IServiceCollection services) where T : class, IBotService
+    public static IServiceCollection AddTelegramBot<TRequest, TResponse>(this IServiceCollection services, Action<TelegramBotConfiguration>? options = null) 
+        where TRequest : class, IBotRequestService 
+        where TResponse : class, IBotResponseService
     {
-        services.AddSingleton<IBotClient, TelegramBotClient>();
-        services.AddTransient<IBotService, T>();
+        var configuration = new TelegramBotConfiguration();
+        
+        if(options is not null)
+            options(configuration);
+      
+        if(!configuration.IsSetCommandsStore)
+            services.AddSingleton<IBotCommandsStore, BotCommandsCache>();
+
+        switch(configuration.ClientLifetime)
+        {
+            case ServiceLifetime.Singleton:
+                services.AddSingleton<IBotClient, TelegramBotClient>();
+                break;
+            case ServiceLifetime.Scoped:
+                services.AddScoped<IBotClient, TelegramBotClient>();
+                break;
+            case ServiceLifetime.Transient:
+                services.AddTransient<IBotClient, TelegramBotClient>();
+                break;
+        }
+
+        return services;
     }
 }
