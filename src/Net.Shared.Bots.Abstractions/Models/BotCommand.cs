@@ -27,6 +27,9 @@ public sealed record BotCommand
 
         var parametersSpan = parametersStartIndex > -1 ? inputSpan[(parametersStartIndex + 1)..] : [];
 
+        if(parametersSpan.Length == 0)
+            return;
+
         foreach (var item in parametersSpan.ToString().Split('&'))
         {
             var keyValue = item.Split('=');

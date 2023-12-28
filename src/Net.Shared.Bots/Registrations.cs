@@ -32,6 +32,10 @@ public static class Registrations
                 break;
         }
 
+
+        services.AddTransient<IBotRequestService, TRequest>();
+        services.AddTransient<IBotResponseService, TResponse>();
+
         return services;
     }
 }

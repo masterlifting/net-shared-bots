@@ -1,5 +1,4 @@
-﻿
-namespace Net.Shared.Bots.Abstractions.Interfaces;
+﻿namespace Net.Shared.Bots.Abstractions.Interfaces;
 
 public interface IBotClient
 {
