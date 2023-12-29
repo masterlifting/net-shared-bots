@@ -2,9 +2,12 @@
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 using Net.Shared.Bots.Abstractions.Interfaces;
 using Net.Shared.Bots.Abstractions.Models;
+using Net.Shared.Bots.Abstractions.Models.Settings;
+using Net.Shared.Extensions;
 
 using Newtonsoft.Json;
 
@@ -12,16 +15,23 @@ using Telegram.Bot;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
+using Telegram.Bot.Types.ReplyMarkups;
 
 using ExternalTelegramBotClient = Telegram.Bot.TelegramBotClient;
 
 namespace Net.Shared.Bots.Telegram;
 
-public sealed class TelegramBotClient(ILogger<TelegramBotClient> logger, IServiceScopeFactory scopeFactory) : IBotClient
+public sealed class TelegramBotClient(
+        ILogger<TelegramBotClient> logger,
+        IOptions<BotConnectionSettings> options,
+        IServiceScopeFactory scopeFactory) : IBotClient
 {
-    private readonly ILogger _logger = logger;
+    private readonly ILogger _log = logger;
     private readonly IServiceScopeFactory _scopeFactory = scopeFactory;
-    private readonly ITelegramBotClient _client = new ExternalTelegramBotClient("");
+
+    private readonly ITelegramBotClient _client = new ExternalTelegramBotClient(
+        Environment.GetEnvironmentVariable(options.Value.TokenVariableName)
+        ?? throw new InvalidOperationException($"Token with name '{options.Value.TokenVariableName}' was not found."));
 
     public async Task Listen(Uri uri, CancellationToken cToken)
     {
@@ -30,7 +40,7 @@ public sealed class TelegramBotClient(ILogger<TelegramBotClient> logger, IServic
     public async Task Listen(CancellationToken cToken)
     {
         await _client.DeleteWebhookAsync(true, cToken);
-        
+
         var options = new ReceiverOptions
         {
         };
@@ -51,12 +61,26 @@ public sealed class TelegramBotClient(ILogger<TelegramBotClient> logger, IServic
     public async Task<byte[]> LoadFile(string fileId, CancellationToken cToken)
     {
         using var stream = new MemoryStream();
-        var file = await _client.GetInfoAndDownloadFileAsync(fileId, stream, cancellationToken:cToken);
+        var file = await _client.GetInfoAndDownloadFileAsync(fileId, stream, cancellationToken: cToken);
         return stream.ToArray();
     }
-    public Task SendButtons(string chatId, Dictionary<string, string> clientButtons, CancellationToken cToken)
+    public async Task SendButtons(string chatId, Dictionary<string, string> clientButtons, CancellationToken cToken)
     {
-        throw new NotImplementedException();
+        var buttons = new InlineKeyboardMarkup(GetButtonPairs(clientButtons.Select(x => InlineKeyboardButton.WithCallbackData(x.Value, x.Key)).ToArray()));
+        
+        await _client.SendTextMessageAsync(chatId, "test", replyMarkup: buttons, cancellationToken: cToken);
+
+        static List<InlineKeyboardButton[]> GetButtonPairs(InlineKeyboardButton[] buttons)
+        {
+            var pairs = new List<InlineKeyboardButton[]>(buttons.Length / 2);
+
+            for (var i = 0; i < buttons.Length; i += 2)
+            {
+                pairs.Add([buttons[i], buttons[i + 1]]);
+            }
+
+            return pairs;
+        }
     }
     public Task SendWebForm(string chatId, object data, CancellationToken cToken)
     {
@@ -67,21 +91,30 @@ public sealed class TelegramBotClient(ILogger<TelegramBotClient> logger, IServic
         throw new NotImplementedException();
     }
 
-    private Task HandleReceivedMessage(ITelegramBotClient client, Update? update, CancellationToken cToken)
+    private async Task HandleReceivedMessage(ITelegramBotClient client, Update? update, CancellationToken cToken)
     {
-        ArgumentNullException.ThrowIfNull(update, "Received data was not recognized.");
-
-        Task result = update.Type switch
+        try
         {
-            UpdateType.Message => HandleMessage(update.Message, cToken),
-            UpdateType.EditedMessage => HandleMessage(update.Message, cToken),
-            UpdateType.ChannelPost => HandleMessage(update.Message, cToken),
-            UpdateType.EditedChannelPost => HandleMessage(update.Message, cToken),
-            UpdateType.CallbackQuery => HandleMessage(update.CallbackQuery?.Message, cToken),
-            _ => throw new NotSupportedException($"Update type {update.Type} is not supported.")
-        };
+            ArgumentNullException.ThrowIfNull(update, "Received data was not recognized.");
 
-        return result;
+            var resultTask = update.Type switch
+            {
+                UpdateType.Message => HandleMessage(update.Message, cToken),
+                UpdateType.EditedMessage => HandleMessage(update.Message, cToken),
+                UpdateType.ChannelPost => HandleMessage(update.Message, cToken),
+                UpdateType.EditedChannelPost => HandleMessage(update.Message, cToken),
+                UpdateType.CallbackQuery => !string.IsNullOrWhiteSpace(update.CallbackQuery?.Data)
+                    ? OnTextHandler(new(update.CallbackQuery.From.Id.ToString(), new(update.CallbackQuery.Data)), cToken)
+                    : throw new InvalidOperationException("Callback data is required."),
+                _ => throw new NotSupportedException($"Update type {update.Type} is not supported.")
+            };
+
+            await resultTask;
+        }
+        catch (Exception ex)
+        {
+            _log.ErrorCompact(ex);
+        }
 
         Task HandleMessage(Message? message, CancellationToken cToken)
         {
@@ -89,22 +122,22 @@ public sealed class TelegramBotClient(ILogger<TelegramBotClient> logger, IServic
 
             return message.Type switch
             {
-                MessageType.Text => !string.IsNullOrWhiteSpace(message.Text) 
+                MessageType.Text => !string.IsNullOrWhiteSpace(message.Text)
                     ? OnTextHandler(new(message.Chat.Id.ToString(), new(message.Text)), cToken)
                     : throw new InvalidOperationException("Text is required."),
-                MessageType.Photo => message.Photo is not null 
+                MessageType.Photo => message.Photo is not null
                     ? OnPhotoHandler(new(message.Chat.Id.ToString(), message.Photo.Select(x => new Photo(x.FileId, x.FileSize)).ToImmutableArray()), cToken)
                     : throw new InvalidOperationException("Photo is required."),
                 MessageType.Audio => message.Audio is not null
                     ? OnAudioHandler(new(message.Chat.Id.ToString(), new(message.Audio.FileId, message.Audio.FileSize, message.Audio.Title, message.Audio.MimeType)), cToken)
                     : throw new InvalidOperationException("Audio is required."),
-                MessageType.Video => message.Video is not null 
+                MessageType.Video => message.Video is not null
                     ? OnVideoHandler(new(message.Chat.Id.ToString(), new(message.Video.FileId, message.Video.FileSize, message.Video.FileName, message.Video.MimeType)), cToken)
                     : throw new InvalidOperationException("Video is required."),
-                MessageType.Voice => message.Voice is not null 
+                MessageType.Voice => message.Voice is not null
                     ? OnVoiceHandler(new(message.Chat.Id.ToString(), new(message.Voice.FileId, message.Voice.FileSize, message.Voice.MimeType)), cToken)
                     : throw new InvalidOperationException("Voice is required."),
-                MessageType.Document => message.Document is not null 
+                MessageType.Document => message.Document is not null
                     ? OnDocumentHandler(new(message.Chat.Id.ToString(), new(message.Document.FileId, message.Document.FileSize, message.Document.FileName, message.Document.MimeType)), cToken)
                     : throw new InvalidOperationException("Document is required."),
                 MessageType.Location => message.Location is not null
@@ -119,7 +152,7 @@ public sealed class TelegramBotClient(ILogger<TelegramBotClient> logger, IServic
     }
     private Task HandleReceivedMessageError(ITelegramBotClient client, Exception exception, CancellationToken cToken)
     {
-        _logger.LogError(exception, "Received message error.");
+        _log.LogError(exception, "Received message error.");
         return Task.CompletedTask;
     }
     private Task HandleSendingMessage(IBotMessage message, CancellationToken cToken)
@@ -127,108 +160,92 @@ public sealed class TelegramBotClient(ILogger<TelegramBotClient> logger, IServic
         throw new NotImplementedException();
     }
 
-    private Task OnTextHandler(TextEventArgs args, CancellationToken cToken)
+    private async Task OnTextHandler(TextEventArgs args, CancellationToken cToken)
     {
-        if(!cToken.IsCancellationRequested)
+        if (!cToken.IsCancellationRequested)
         {
-            using var scope = _scopeFactory.CreateAsyncScope();
+            await using var scope = _scopeFactory.CreateAsyncScope();
 
             var requestService = scope.ServiceProvider.GetRequiredService<IBotRequestService>();
 
-            return requestService.OnTextHandler(args);
-        }    
-
-        return Task.CompletedTask;
-    }
-    private Task OnPhotoHandler(PhotoEventArgs args, CancellationToken cToken)
-    {
-        if(!cToken.IsCancellationRequested)
-        {
-            using var scope = _scopeFactory.CreateAsyncScope();
-
-            var requestService = scope.ServiceProvider.GetRequiredService<IBotRequestService>();
-
-            return requestService.OnPhotoHandler(args);
+            await requestService.OnTextHandler(args);
         }
-
-        return Task.CompletedTask;
     }
-    private Task OnAudioHandler(AudioEventArgs args, CancellationToken cToken)
+    private async Task OnPhotoHandler(PhotoEventArgs args, CancellationToken cToken)
     {
-        if(!cToken.IsCancellationRequested)
+        if (!cToken.IsCancellationRequested)
         {
-            using var scope = _scopeFactory.CreateAsyncScope();
+            await using var scope = _scopeFactory.CreateAsyncScope();
 
             var requestService = scope.ServiceProvider.GetRequiredService<IBotRequestService>();
 
-            return requestService.OnAudioHandler(args);
+            await requestService.OnPhotoHandler(args);
         }
-
-        return Task.CompletedTask;
     }
-    private Task OnVideoHandler(VideoEventArgs args, CancellationToken cToken)
+    private async Task OnAudioHandler(AudioEventArgs args, CancellationToken cToken)
     {
-        if(!cToken.IsCancellationRequested)
+        if (!cToken.IsCancellationRequested)
         {
-            using var scope = _scopeFactory.CreateAsyncScope();
+            await using var scope = _scopeFactory.CreateAsyncScope();
 
             var requestService = scope.ServiceProvider.GetRequiredService<IBotRequestService>();
 
-            return requestService.OnVideoHandler(args);
+            await requestService.OnAudioHandler(args);
         }
-
-        return Task.CompletedTask;
     }
-    private Task OnVoiceHandler(VoiceEventArgs args, CancellationToken cToken)
+    private async Task OnVideoHandler(VideoEventArgs args, CancellationToken cToken)
     {
-        if(!cToken.IsCancellationRequested)
+        if (!cToken.IsCancellationRequested)
         {
-            using var scope = _scopeFactory.CreateAsyncScope();
+            await using var scope = _scopeFactory.CreateAsyncScope();
 
             var requestService = scope.ServiceProvider.GetRequiredService<IBotRequestService>();
 
-            return requestService.OnVoiceHandler(args);
+            await requestService.OnVideoHandler(args);
         }
-
-        return Task.CompletedTask;
     }
-    private Task OnDocumentHandler(DocumentEventArgs args, CancellationToken cToken)
+    private async Task OnVoiceHandler(VoiceEventArgs args, CancellationToken cToken)
     {
-        if(!cToken.IsCancellationRequested)
+        if (!cToken.IsCancellationRequested)
         {
-            using var scope = _scopeFactory.CreateAsyncScope();
+            await using var scope = _scopeFactory.CreateAsyncScope();
 
             var requestService = scope.ServiceProvider.GetRequiredService<IBotRequestService>();
 
-            return requestService.OnDocumentHandler(args);
+            await requestService.OnVoiceHandler(args);
         }
-
-        return Task.CompletedTask;
     }
-    private Task OnLocationHandler(LocationEventArgs args, CancellationToken cToken)
+    private async Task OnDocumentHandler(DocumentEventArgs args, CancellationToken cToken)
     {
-        if(!cToken.IsCancellationRequested)
+        if (!cToken.IsCancellationRequested)
         {
-            using var scope = _scopeFactory.CreateAsyncScope();
+            await using var scope = _scopeFactory.CreateAsyncScope();
 
             var requestService = scope.ServiceProvider.GetRequiredService<IBotRequestService>();
 
-            return requestService.OnLocationHandler(args);
+            await requestService.OnDocumentHandler(args);
         }
-
-        return Task.CompletedTask;
     }
-    private Task OnContactHandler(ContactEventArgs args, CancellationToken cToken)
+    private async Task OnLocationHandler(LocationEventArgs args, CancellationToken cToken)
     {
-        if(!cToken.IsCancellationRequested)
+        if (!cToken.IsCancellationRequested)
         {
-            using var scope = _scopeFactory.CreateAsyncScope();
+            await using var scope = _scopeFactory.CreateAsyncScope();
 
             var requestService = scope.ServiceProvider.GetRequiredService<IBotRequestService>();
 
-            return requestService.OnContactHandler(args);
+            await requestService.OnLocationHandler(args);
         }
+    }
+    private async Task OnContactHandler(ContactEventArgs args, CancellationToken cToken)
+    {
+        if (!cToken.IsCancellationRequested)
+        {
+            await using var scope = _scopeFactory.CreateAsyncScope();
 
-        return Task.CompletedTask;
+            var requestService = scope.ServiceProvider.GetRequiredService<IBotRequestService>();
+
+            await requestService.OnContactHandler(args);
+        }
     }
 }
