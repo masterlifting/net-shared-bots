@@ -1,4 +1,6 @@
-﻿namespace Net.Shared.Bots.Abstractions.Interfaces;
+﻿using Net.Shared.Bots.Abstractions.Models;
+
+namespace Net.Shared.Bots.Abstractions.Interfaces;
 
 public interface IBotClient
 {
@@ -7,7 +9,7 @@ public interface IBotClient
     Task Send(IBotMessage message, CancellationToken cToken);
     Task Receive(string data, CancellationToken cToken);
     Task<byte[]> LoadFile(string fileId, CancellationToken cToken);
-    Task SendButtons(string chatId, Dictionary<string, string> clientButtons, CancellationToken cToken);
+    Task SendButtons(ButtonsEventArgs args, CancellationToken cToken);
     Task SendWebForm(string chatId, object data, CancellationToken cToken);
     Task SendText(string chatId, string v, CancellationToken cToken);
 }

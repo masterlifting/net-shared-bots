@@ -2,14 +2,14 @@
 
 namespace Net.Shared.Bots.Abstractions.Models;
 
-public sealed record BotCommand
+public sealed record BotCommand1
 {
     public string Name { get; }
     public IReadOnlyDictionary<string, string> Parameters => _parameters;
 
     private readonly Dictionary<string, string> _parameters = new(10);
 
-    public BotCommand(string input)
+    public BotCommand1(string input)
     {
         var inputSpan = input.AsSpan();
 
@@ -66,3 +66,4 @@ public sealed record BotCommand
         return builder.ToString();
     }
 }
+public sealed record BotCommand(string Name, Dictionary<string, string> Parameters);

@@ -8,3 +8,4 @@ public sealed record VoiceEventArgs(string ChatId, Voice Voice);
 public sealed record DocumentEventArgs(string ChatId, Document Document);
 public sealed record LocationEventArgs(string ChatId, Location Location);
 public sealed record ContactEventArgs(string ChatId, Contact Contact);
+public sealed record ExceptionEventArgs(string ChatId, Exception Exception);
