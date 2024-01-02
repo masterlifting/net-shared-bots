@@ -12,10 +12,12 @@ public static class Registrations
     public static IServiceCollection AddTelegramBot(this IServiceCollection services, Action<BotConfiguration> configure)
     {
         services
-            .AddOptions<BotConnection>()
+            .AddOptions<TelegramBotConnectionSettings>()
             .Configure<IConfiguration>((settings, configuration) =>
             {
-                configuration.GetSection(BotConnection.SectionName).Bind(settings);
+                configuration
+                    .GetSection(TelegramBotConnectionSettings.SectionName)
+                    .Bind(settings);
             });
 
         var botConfiguration = new BotConfiguration(services);
@@ -35,7 +37,7 @@ public static class Registrations
                 break;
         }
 
-        if(!botConfiguration.IsSetRequestHandler)
+        if (!botConfiguration.IsSetRequestHandler)
             throw new NotImplementedException($"Request handler should implement {nameof(IBotRequestService)} and set by configuration of the bot.");
 
         if (!botConfiguration.IsSetResponseHandler)

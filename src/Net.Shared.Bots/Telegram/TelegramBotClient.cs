@@ -21,16 +21,13 @@ using ExternalTelegramBotClient = Telegram.Bot.TelegramBotClient;
 namespace Net.Shared.Bots.Telegram;
 
 public sealed class TelegramBotClient(
-        ILogger<TelegramBotClient> logger,
-        IOptions<BotConnection> options,
-        IServiceScopeFactory scopeFactory) : IBotClient
+    ILogger<TelegramBotClient> logger,
+    IOptions<TelegramBotConnectionSettings> options,
+    IServiceScopeFactory scopeFactory) : IBotClient
 {
     private readonly ILogger _log = logger;
     private readonly IServiceScopeFactory _scopeFactory = scopeFactory;
-
-    private readonly ITelegramBotClient _client = new ExternalTelegramBotClient(
-        Environment.GetEnvironmentVariable(options.Value.TokenVariableName)
-        ?? throw new InvalidOperationException($"Token with name '{options.Value.TokenVariableName}' was not found."));
+    private readonly ITelegramBotClient _client = new ExternalTelegramBotClient(options.Value.Token);
 
     public async Task Listen(Uri uri, CancellationToken cToken)
     {
