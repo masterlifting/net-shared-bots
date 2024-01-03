@@ -10,6 +10,6 @@ public interface IBotClient
     Task Receive(string data, CancellationToken cToken);
     Task<byte[]> LoadFile(string fileId, CancellationToken cToken);
     Task SendButtons(ButtonsEventArgs args, CancellationToken cToken);
-    Task SendWebForm(string chatId, object data, CancellationToken cToken);
+    Task SendWebAppPage(WebAppEventArgs args, CancellationToken cToken);
     Task SendText(string chatId, string v, CancellationToken cToken);
 }

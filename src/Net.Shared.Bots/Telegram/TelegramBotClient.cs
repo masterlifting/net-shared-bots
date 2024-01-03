@@ -5,10 +5,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-using Net.Shared.Extensions.Logging;
 using Net.Shared.Bots.Abstractions.Interfaces;
 using Net.Shared.Bots.Abstractions.Models;
 using Net.Shared.Bots.Abstractions.Models.Settings;
+using Net.Shared.Extensions.Logging;
 
 using Telegram.Bot;
 using Telegram.Bot.Polling;
@@ -70,21 +70,28 @@ public sealed class TelegramBotClient(
 
         static List<InlineKeyboardButton[]> CreateButtonsByColumns(byte columns, Dictionary<string, string> data)
         {
-            var chunkSize = (int)MathF.Ceiling(data.Count / (float)columns);
+            var rowsCount = (int)MathF.Ceiling(data.Count / (float)columns);
 
-            var result = new List<InlineKeyboardButton[]>(data.Count / chunkSize + 1);
+            var result = new List<InlineKeyboardButton[]>(rowsCount);
 
-            for (var i = 0; i < data.Count; i += chunkSize)
-            {
-                result.Add(data.Skip(i).Take(chunkSize).Select(x => InlineKeyboardButton.WithCallbackData(x.Value, x.Key)).ToArray());
-            }
+            for (var i = 0; i < data.Count; i += columns)
+                result.Add(data.Skip(i).Take(columns).Select(x => InlineKeyboardButton.WithCallbackData(x.Value, x.Key)).ToArray());
 
             return result;
         }
     }
-    public Task SendWebForm(string chatId, object data, CancellationToken cToken)
+    public Task SendWebAppPage(WebAppEventArgs args, CancellationToken cToken)
     {
-        throw new NotImplementedException();
+        var inlineKeyboard = new InlineKeyboardMarkup(new[]
+        {
+                new[] { InlineKeyboardButton.WithWebApp(args.WebApp.Name, new()
+                {
+                    Url = args.WebApp.Uri.ToString(),
+                }) }
+            }
+        );
+
+        return _client.SendTextMessageAsync(args.ChatId, args.WebApp.Name, replyMarkup: inlineKeyboard, cancellationToken: cToken);
     }
     public Task SendText(string chatId, string v, CancellationToken cToken)
     {
@@ -193,8 +200,8 @@ public sealed class TelegramBotClient(
         !cToken.IsCancellationRequested
             ? service.OnLocationHandler(args, cToken)
             : Task.CompletedTask;
-    private static Task OnContactHandler(IBotRequestService service, ContactEventArgs args, CancellationToken cToken) => 
-        !cToken.IsCancellationRequested 
-            ? service.OnContactHandler(args, cToken) 
+    private static Task OnContactHandler(IBotRequestService service, ContactEventArgs args, CancellationToken cToken) =>
+        !cToken.IsCancellationRequested
+            ? service.OnContactHandler(args, cToken)
             : Task.CompletedTask;
 }
