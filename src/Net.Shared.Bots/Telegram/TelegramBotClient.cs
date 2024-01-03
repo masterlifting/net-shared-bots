@@ -5,10 +5,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
+using Net.Shared.Extensions.Logging;
 using Net.Shared.Bots.Abstractions.Interfaces;
 using Net.Shared.Bots.Abstractions.Models;
 using Net.Shared.Bots.Abstractions.Models.Settings;
-using Net.Shared.Extensions;
 
 using Telegram.Bot;
 using Telegram.Bot.Polling;
@@ -156,7 +156,7 @@ public sealed class TelegramBotClient(
     }
     private Task HandleReceivedMessageError(ITelegramBotClient client, Exception exception, CancellationToken cToken)
     {
-        _log.ErrorCompact(exception);
+        _log.ErrorFull(exception);
         return Task.CompletedTask;
     }
 
@@ -165,44 +165,36 @@ public sealed class TelegramBotClient(
         throw new NotImplementedException();
     }
 
-    private static async Task OnTextHandler(IBotRequestService requestService, TextEventArgs args, CancellationToken cToken)
-    {
-        if (!cToken.IsCancellationRequested)
-            await requestService.OnTextHandler(args);
-    }
-    private static async Task OnPhotoHandler(IBotRequestService requestService, PhotoEventArgs args, CancellationToken cToken)
-    {
-        if (!cToken.IsCancellationRequested)
-            await requestService.OnPhotoHandler(args);
-    }
-    private static async Task OnAudioHandler(IBotRequestService requestService, AudioEventArgs args, CancellationToken cToken)
-    {
-        if (!cToken.IsCancellationRequested)
-            await requestService.OnAudioHandler(args);
-    }
-    private static async Task OnVideoHandler(IBotRequestService requestService, VideoEventArgs args, CancellationToken cToken)
-    {
-        if (!cToken.IsCancellationRequested)
-            await requestService.OnVideoHandler(args);
-    }
-    private static async Task OnVoiceHandler(IBotRequestService requestService, VoiceEventArgs args, CancellationToken cToken)
-    {
-        if (!cToken.IsCancellationRequested)
-            await requestService.OnVoiceHandler(args);
-    }
-    private static async Task OnDocumentHandler(IBotRequestService requestService, DocumentEventArgs args, CancellationToken cToken)
-    {
-        if (!cToken.IsCancellationRequested)
-            await requestService.OnDocumentHandler(args);
-    }
-    private static async Task OnLocationHandler(IBotRequestService requestService, LocationEventArgs args, CancellationToken cToken)
-    {
-        if (!cToken.IsCancellationRequested)
-            await requestService.OnLocationHandler(args);
-    }
-    private static async Task OnContactHandler(IBotRequestService requestService, ContactEventArgs args, CancellationToken cToken)
-    {
-        if (!cToken.IsCancellationRequested)
-            await requestService.OnContactHandler(args);
-    }
+    private static Task OnTextHandler(IBotRequestService service, TextEventArgs args, CancellationToken cToken) =>
+        !cToken.IsCancellationRequested
+            ? service.OnTextHandler(args, cToken)
+            : Task.CompletedTask;
+    private static Task OnPhotoHandler(IBotRequestService service, PhotoEventArgs args, CancellationToken cToken) =>
+        !cToken.IsCancellationRequested
+            ? service.OnPhotoHandler(args, cToken)
+            : Task.CompletedTask;
+    private static Task OnAudioHandler(IBotRequestService service, AudioEventArgs args, CancellationToken cToken) =>
+        !cToken.IsCancellationRequested
+            ? service.OnAudioHandler(args, cToken)
+            : Task.CompletedTask;
+    private static Task OnVideoHandler(IBotRequestService service, VideoEventArgs args, CancellationToken cToken) =>
+        !cToken.IsCancellationRequested
+            ? service.OnVideoHandler(args, cToken)
+            : Task.CompletedTask;
+    private static Task OnVoiceHandler(IBotRequestService service, VoiceEventArgs args, CancellationToken cToken) =>
+        !cToken.IsCancellationRequested
+            ? service.OnVoiceHandler(args, cToken)
+            : Task.CompletedTask;
+    private static Task OnDocumentHandler(IBotRequestService service, DocumentEventArgs args, CancellationToken cToken) =>
+        !cToken.IsCancellationRequested
+            ? service.OnDocumentHandler(args, cToken)
+            : Task.CompletedTask;
+    private static Task OnLocationHandler(IBotRequestService service, LocationEventArgs args, CancellationToken cToken) =>
+        !cToken.IsCancellationRequested
+            ? service.OnLocationHandler(args, cToken)
+            : Task.CompletedTask;
+    private static Task OnContactHandler(IBotRequestService service, ContactEventArgs args, CancellationToken cToken) => 
+        !cToken.IsCancellationRequested 
+            ? service.OnContactHandler(args, cToken) 
+            : Task.CompletedTask;
 }

@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+
 using Net.Shared.Bots.Abstractions.Interfaces;
 
 namespace Net.Shared.Bots;

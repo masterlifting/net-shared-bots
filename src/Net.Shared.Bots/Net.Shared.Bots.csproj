@@ -11,7 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\shared-extensions\src\Net.Shared.Extensions\Net.Shared.Extensions.csproj" />
+    <ProjectReference Include="..\..\..\shared\src\Net.Shared\Net.Shared.csproj" />
     <ProjectReference Include="..\Net.Shared.Bots.Abstractions\Net.Shared.Bots.Abstractions.csproj" />
   </ItemGroup>
 
