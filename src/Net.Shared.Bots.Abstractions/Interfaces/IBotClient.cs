@@ -6,10 +6,11 @@ public interface IBotClient
 {
     Task Listen(Uri uri, CancellationToken cToken);
     Task Listen(CancellationToken cToken);
-    Task Send(IBotMessage message, CancellationToken cToken);
     Task Receive(string data, CancellationToken cToken);
+
     Task<byte[]> LoadFile(string fileId, CancellationToken cToken);
+    
     Task SendButtons(ButtonsEventArgs args, CancellationToken cToken);
-    Task SendWebAppPage(WebAppEventArgs args, CancellationToken cToken);
-    Task SendText(string chatId, string v, CancellationToken cToken);
+    Task SendWebApp(WebAppEventArgs args, CancellationToken cToken);
+    Task SendMessage(MessageEventArgs args, CancellationToken cToken);
 }

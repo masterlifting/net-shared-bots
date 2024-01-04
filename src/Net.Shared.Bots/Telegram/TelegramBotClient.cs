@@ -17,6 +17,7 @@ using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.ReplyMarkups;
 
 using ExternalTelegramBotClient = Telegram.Bot.TelegramBotClient;
+using Message = Telegram.Bot.Types.Message;
 
 namespace Net.Shared.Bots.Telegram;
 
@@ -43,10 +44,6 @@ public sealed class TelegramBotClient(
 
         _client.StartReceiving(HandleReceivedMessage, HandleReceivedMessageError, options, cToken);
     }
-    public async Task Send(IBotMessage message, CancellationToken cToken)
-    {
-        await HandleSendingMessage(message, cToken);
-    }
     public async Task Receive(string data, CancellationToken cToken)
     {
         var update = JsonSerializer.Deserialize<Update>(data);
@@ -60,42 +57,61 @@ public sealed class TelegramBotClient(
         var file = await _client.GetInfoAndDownloadFileAsync(fileId, stream, cancellationToken: cToken);
         return stream.ToArray();
     }
+    
     public async Task SendButtons(ButtonsEventArgs args, CancellationToken cToken)
     {
-        var buttonsByColumns = CreateButtonsByColumns(args.Buttons.Columns, args.Buttons.Data);
+        var buttonsByColumns = CreateByColumns(args.Buttons.Columns, args.Buttons.Data);
 
         var result = new InlineKeyboardMarkup(buttonsByColumns);
 
         await _client.SendTextMessageAsync(args.ChatId, args.Buttons.Name, replyMarkup: result, cancellationToken: cToken);
 
-        static List<InlineKeyboardButton[]> CreateButtonsByColumns(byte columns, Dictionary<string, string> data)
+        static List<InlineKeyboardButton[]> CreateByColumns(byte columns, Dictionary<string, string> data)
         {
             var rowsCount = (int)MathF.Ceiling(data.Count / (float)columns);
 
             var result = new List<InlineKeyboardButton[]>(rowsCount);
 
             for (var i = 0; i < data.Count; i += columns)
-                result.Add(data.Skip(i).Take(columns).Select(x => InlineKeyboardButton.WithCallbackData(x.Value, x.Key)).ToArray());
+                result.Add(data
+                    .Skip(i)
+                    .Take(columns)
+                    .Select(x => InlineKeyboardButton.WithCallbackData(x.Value, x.Key))
+                    .ToArray());
 
             return result;
         }
     }
-    public Task SendWebAppPage(WebAppEventArgs args, CancellationToken cToken)
+    public async Task SendWebApp(WebAppEventArgs args, CancellationToken cToken)
     {
-        var inlineKeyboard = new InlineKeyboardMarkup(new[]
-        {
-                new[] { InlineKeyboardButton.WithWebApp(args.WebApp.Name, new()
-                {
-                    Url = args.WebApp.Uri.ToString(),
-                }) }
-            }
-        );
+        var buttonsByColumns = CreateByColumns(args.WebApp.Columns, args.WebApp.Data);
 
-        return _client.SendTextMessageAsync(args.ChatId, args.WebApp.Name, replyMarkup: inlineKeyboard, cancellationToken: cToken);
+        var result = new InlineKeyboardMarkup(buttonsByColumns);
+
+        await _client.SendTextMessageAsync(args.ChatId, args.WebApp.Name, replyMarkup: result, cancellationToken: cToken);
+
+        static List<InlineKeyboardButton[]> CreateByColumns(byte columns, Dictionary<string, Uri> data)
+        {
+            var rowsCount = (int)MathF.Ceiling(data.Count / (float)columns);
+
+            var result = new List<InlineKeyboardButton[]>(rowsCount);
+
+            for (var i = 0; i < data.Count; i += columns)
+                result.Add(data
+                    .Skip(i)
+                    .Take(columns)
+                    .Select(x => InlineKeyboardButton.WithWebApp(x.Key, new()
+                    {
+                        Url = x.Value.ToString(),
+                    }))
+                    .ToArray());
+
+            return result;
+        }
     }
-    public Task SendText(string chatId, string v, CancellationToken cToken)
+    public Task SendMessage(MessageEventArgs args, CancellationToken cToken)
     {
-        throw new NotImplementedException();
+        return _client.SendTextMessageAsync(args.ChatId, args.Message.Text, cancellationToken: cToken);
     }
 
     private async Task HandleReceivedMessage(ITelegramBotClient client, Update? update, CancellationToken cToken)
@@ -165,11 +181,6 @@ public sealed class TelegramBotClient(
     {
         _log.ErrorCompact(exception);
         return Task.CompletedTask;
-    }
-
-    private Task HandleSendingMessage(IBotMessage message, CancellationToken cToken)
-    {
-        throw new NotImplementedException();
     }
 
     private static Task OnTextHandler(IBotRequestService service, TextEventArgs args, CancellationToken cToken) =>
