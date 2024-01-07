@@ -9,7 +9,8 @@ namespace Net.Shared.Bots;
 
 public static class Registrations
 {
-    public static IServiceCollection AddTelegramBot(this IServiceCollection services, Action<BotConfiguration> configure)
+    public static IServiceCollection AddTelegramBot<TResponse>(this IServiceCollection services, Action<BotConfiguration> configure)
+        where TResponse : class, IBotResponse
     {
         services
             .AddOptions<TelegramBotConnectionSettings>()
@@ -37,14 +38,12 @@ public static class Registrations
                 break;
         }
 
-        if (!botConfiguration.IsSetRequestHandler)
-            throw new NotImplementedException($"Request handler should implement {nameof(IBotRequestService)} and set by configuration of the bot.");
-
-        if (!botConfiguration.IsSetResponseHandler)
-            throw new NotImplementedException($"Response handler should implement {nameof(IBotResponseService)} and set by configuration of the bot.");
+        services.AddTransient<IBotResponse, TResponse>();
 
         if (!botConfiguration.IsSetCommandsStore)
             services.AddSingleton<IBotCommandsStore, BotCommandsCache>();
+
+        services.AddTransient<IBotRequest, BotRequest>();
 
         return services;
     }
