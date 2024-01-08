@@ -19,7 +19,11 @@ public static class Registrations
                 configuration
                     .GetSection(TelegramBotConnectionSettings.SectionName)
                     .Bind(settings);
-            });
+            })
+            .ValidateOnStart()
+            .Validate(x => !string.IsNullOrWhiteSpace(x.Token), "Token of Telegram bot should not be empty.")
+            .Validate(x => !string.IsNullOrWhiteSpace(x.AdminChatId), "Admin chat id of Telegram bot should not be empty.");
+
 
         var botConfiguration = new BotConfiguration(services);
 

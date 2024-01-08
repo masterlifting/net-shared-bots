@@ -4,6 +4,7 @@ namespace Net.Shared.Bots.Abstractions.Interfaces;
 
 public interface IBotClient
 {
+    string AdminChatId { get; }
     Task Listen(Uri uri, CancellationToken cToken);
     Task Listen(CancellationToken cToken);
     Task Receive(string data, CancellationToken cToken);

@@ -30,6 +30,8 @@ public sealed class TelegramBotClient(
     private readonly IServiceScopeFactory _scopeFactory = scopeFactory;
     private readonly ITelegramBotClient _client = new ExternalTelegramBotClient(options.Value.Token);
 
+    public string AdminChatId => options.Value.AdminChatId;
+
     public async Task Listen(Uri uri, CancellationToken cToken)
     {
         await _client.DeleteWebhookAsync(true, cToken);
@@ -127,12 +129,12 @@ public sealed class TelegramBotClient(
 
             var result = update.Type switch
             {
-                UpdateType.Message => HandleMessage(request, update.Message, cToken),
-                UpdateType.EditedMessage => HandleMessage(request, update.Message, cToken),
-                UpdateType.ChannelPost => HandleMessage(request, update.Message, cToken),
-                UpdateType.EditedChannelPost => HandleMessage(request, update.Message, cToken),
+                UpdateType.Message => HandleMessage(request, update.Message, AdminChatId, cToken),
+                UpdateType.EditedMessage => HandleMessage(request, update.Message, AdminChatId, cToken),
+                UpdateType.ChannelPost => HandleMessage(request, update.Message, AdminChatId, cToken),
+                UpdateType.EditedChannelPost => HandleMessage(request, update.Message, AdminChatId, cToken),
                 UpdateType.CallbackQuery => !string.IsNullOrWhiteSpace(update.CallbackQuery?.Data)
-                    ? OnTextHandler(request, new(update.CallbackQuery.From.Id.ToString(), new(update.CallbackQuery.Data)), cToken)
+                    ? OnTextHandler(request, new(new(update.CallbackQuery.From.Id.ToString(), AdminChatId), new(update.CallbackQuery.Data)), cToken)
                     : throw new InvalidOperationException("Callback data is required."),
                 _ => throw new NotSupportedException($"Update type {update.Type} is not supported.")
             };
@@ -144,35 +146,35 @@ public sealed class TelegramBotClient(
             await HandleReceivedMessageError(client, exception, cToken);
         }
 
-        static Task HandleMessage(IBotRequest request, Message? message, CancellationToken cToken)
+        static Task HandleMessage(IBotRequest request, Message? message, string AdminChatId, CancellationToken cToken)
         {
             ArgumentNullException.ThrowIfNull(message, "Received data was not recognized.");
 
             return message.Type switch
             {
                 MessageType.Text => !string.IsNullOrWhiteSpace(message.Text)
-                    ? OnTextHandler(request, new(message.Chat.Id.ToString(), new(message.Text)), cToken)
+                    ? OnTextHandler(request, new(new(message.Chat.Id.ToString(), AdminChatId), new(message.Text)), cToken)
                     : throw new InvalidOperationException("Text is required."),
                 MessageType.Photo => message.Photo is not null
-                    ? OnPhotoHandler(request, new(message.Chat.Id.ToString(), message.Photo.Select(x => new Photo(x.FileId, x.FileSize)).ToImmutableArray()), cToken)
+                    ? OnPhotoHandler(request, new(new(message.Chat.Id.ToString(), AdminChatId), message.Photo.Select(x => new Photo(x.FileId, x.FileSize)).ToImmutableArray()), cToken)
                     : throw new InvalidOperationException("Photo is required."),
                 MessageType.Audio => message.Audio is not null
-                    ? OnAudioHandler(request, new(message.Chat.Id.ToString(), new(message.Audio.FileId, message.Audio.FileSize, message.Audio.Title, message.Audio.MimeType)), cToken)
+                    ? OnAudioHandler(request, new(new(message.Chat.Id.ToString(), AdminChatId), new(message.Audio.FileId, message.Audio.FileSize, message.Audio.Title, message.Audio.MimeType)), cToken)
                     : throw new InvalidOperationException("Audio is required."),
                 MessageType.Video => message.Video is not null
-                    ? OnVideoHandler(request, new(message.Chat.Id.ToString(), new(message.Video.FileId, message.Video.FileSize, message.Video.FileName, message.Video.MimeType)), cToken)
+                    ? OnVideoHandler(request, new(new(message.Chat.Id.ToString(), AdminChatId), new(message.Video.FileId, message.Video.FileSize, message.Video.FileName, message.Video.MimeType)), cToken)
                     : throw new InvalidOperationException("Video is required."),
                 MessageType.Voice => message.Voice is not null
-                    ? OnVoiceHandler(request, new(message.Chat.Id.ToString(), new(message.Voice.FileId, message.Voice.FileSize, message.Voice.MimeType)), cToken)
+                    ? OnVoiceHandler(request, new(new(message.Chat.Id.ToString(), AdminChatId), new(message.Voice.FileId, message.Voice.FileSize, message.Voice.MimeType)), cToken)
                     : throw new InvalidOperationException("Voice is required."),
                 MessageType.Document => message.Document is not null
-                    ? OnDocumentHandler(request, new(message.Chat.Id.ToString(), new(message.Document.FileId, message.Document.FileSize, message.Document.FileName, message.Document.MimeType)), cToken)
+                    ? OnDocumentHandler(request, new(new(message.Chat.Id.ToString(), AdminChatId), new(message.Document.FileId, message.Document.FileSize, message.Document.FileName, message.Document.MimeType)), cToken)
                     : throw new InvalidOperationException("Document is required."),
                 MessageType.Location => message.Location is not null
-                    ? OnLocationHandler(request, new(message.Chat.Id.ToString(), new(message.Location.Latitude, message.Location.Longitude)), cToken)
+                    ? OnLocationHandler(request, new(new(message.Chat.Id.ToString(), AdminChatId), new(message.Location.Latitude, message.Location.Longitude)), cToken)
                     : throw new InvalidOperationException("Location is required."),
                 MessageType.Contact => message.Contact is not null
-                    ? OnContactHandler(request, new(message.Chat.Id.ToString(), new(message.Contact.PhoneNumber, message.Contact.FirstName, message.Contact.LastName)), cToken)
+                    ? OnContactHandler(request, new(new(message.Chat.Id.ToString(), AdminChatId), new(message.Contact.PhoneNumber, message.Contact.FirstName, message.Contact.LastName)), cToken)
                     : throw new InvalidOperationException("Contact is required."),
                 _ => throw new NotSupportedException($"Message type {message.Type} is not supported.")
             };

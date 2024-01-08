@@ -1,6 +1,8 @@
 ﻿using Net.Shared.Bots.Abstractions.Interfaces;
 using Net.Shared.Bots.Abstractions.Models;
 
+using static Net.Shared.Bots.Abstractions.Constants;
+
 namespace Net.Shared.Bots;
 
 internal sealed class BotRequest(
@@ -15,13 +17,49 @@ internal sealed class BotRequest(
         if (args.Text.Value.StartsWith('/'))
         {
             var commandName = args.Text.Value.TrimStart('/');
-            var command = await _commandsStore.Create(args.ChatId, commandName, [], cToken);
-            await _response.Create(args.ChatId, command, cToken);
+
+            var parametersStartIndex = commandName.IndexOf('?');
+
+            var commandParameters = new Dictionary<string, string>(5);
+
+            if (parametersStartIndex > 2)
+            {
+                commandName = commandName[..parametersStartIndex];
+
+                var parameters = args.Text.Value[(parametersStartIndex + 2)..].Split('&', StringSplitOptions.RemoveEmptyEntries);
+
+                foreach (var parameter in parameters)
+                {
+                    var keyValue = parameter.Split('=', StringSplitOptions.RemoveEmptyEntries);
+
+                    if (keyValue.Length != 2)
+                        throw new NotSupportedException($"The parameter '{parameter}' is not supported.");
+
+                    commandParameters.Add(keyValue[0], keyValue[1]);
+                }
+            }
+
+            var command = await _commandsStore.Create(args.Chat.Id, commandName, commandParameters, cToken);
+            await _response.Create(args.Chat.Id, command, cToken);
+        }
+        else if (args.Text.Value.StartsWith('\"') && args.Text.Value.EndsWith('\"'))
+        {
+            var commandName = Commands.Ask;
+
+            var text = $"ChatId: {args.Chat.Id}, Message: {args.Text.Value.Trim('\"')}";
+
+            var commandParameters = new Dictionary<string, string>
+            {
+                { CommandParameters.Message, text }
+            };
+            var command = await _commandsStore.Create(args.Chat.AdminId, commandName, commandParameters, cToken);
+
+            await _response.Create(args.Chat.AdminId, command, cToken);
         }
         else if (Guid.TryParse(args.Text.Value, out var guid))
         {
-            var command = await _commandsStore.Get(args.ChatId, guid, cToken);
-            await _response.Create(args.ChatId, command, cToken);
+            var command = await _commandsStore.Get(args.Chat.Id, guid, cToken);
+            await _response.Create(args.Chat.Id, command, cToken);
         }
         else
             throw new NotSupportedException($"The message '{args.Text.Value}' is not supported.");
