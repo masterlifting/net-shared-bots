@@ -17,8 +17,9 @@ public sealed class BotCommandsCache : IBotCommandsStore
 
         if(_storage.TryGetValue(chatId, out var commands))
         {
-            if (commands.ContainsKey(commandId))
-                throw new InvalidOperationException($"The command '{commandId}' for chat '{chatId}' already exists.");
+            commands[commandId] = commands.ContainsKey(commandId)
+                ? throw new InvalidOperationException($"The command '{commandId}' for chat '{chatId}' already exists.")
+                : command;
         }
         else
             _storage.TryAdd(chatId, new Dictionary<Guid, BotCommand> { { commandId, command } });
