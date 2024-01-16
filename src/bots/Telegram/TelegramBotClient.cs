@@ -214,6 +214,8 @@ public sealed class TelegramBotClient(
     private Task HandleReceivedMessageError(ITelegramBotClient client, Exception exception, CancellationToken cToken)
     {
         _log.ErrorFull(exception);
+        if (exception.InnerException is not null)
+            _log.ErrorFull(exception.InnerException);
         return client.SendTextMessageAsync(AdminId, exception.Message, cancellationToken: cToken);
     }
 
