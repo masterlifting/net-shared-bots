@@ -1,7 +1,7 @@
 ﻿using Microsoft.Extensions.Options;
 
 using Net.Shared.Bots.Abstractions.Interfaces;
-using Net.Shared.Bots.Abstractions.Models;
+using Net.Shared.Bots.Abstractions.Models.Request;
 using Net.Shared.Bots.Abstractions.Models.Settings;
 
 using static Net.Shared.Bots.Abstractions.Constants;
@@ -46,7 +46,7 @@ internal sealed class BotRequest(
 
             var command = await _botCommandsStore.Create(args.Chat.Id, commandName, commandParameters, cToken);
 
-            await _botResponse.Create(args.Chat.Id, command, cToken);
+            await _botResponse.Create(args.Chat, command, cToken);
 
         }
         else if (args.Text.Value.StartsWith('\"') && args.Text.Value.EndsWith('\"'))

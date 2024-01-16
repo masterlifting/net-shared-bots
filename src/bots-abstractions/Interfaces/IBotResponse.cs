@@ -1,8 +1,9 @@
-﻿using Net.Shared.Bots.Abstractions.Models;
+﻿using Net.Shared.Bots.Abstractions.Models.Bot;
 
 namespace Net.Shared.Bots.Abstractions.Interfaces;
 
 public interface IBotResponse
 {
-    Task Create(string chatId, BotCommand command, CancellationToken cToken);
+    Task Create(Chat chat, Command command, CancellationToken cToken);
+    Task Create(string chatId, Command command, CancellationToken cToken);
 }

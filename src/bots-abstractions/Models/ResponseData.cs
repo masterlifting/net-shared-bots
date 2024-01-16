@@ -1,4 +1,4 @@
-﻿namespace Net.Shared.Bots.Abstractions.Models;
+﻿namespace Net.Shared.Bots.Abstractions.Models.Response;
 
 public sealed record Message(string Text);
 public sealed record Buttons(string Name, byte Columns, Dictionary<string, string> Data);

@@ -6,8 +6,9 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 using Net.Shared.Bots.Abstractions.Interfaces;
-using Net.Shared.Bots.Abstractions.Models;
 using Net.Shared.Bots.Abstractions.Models.Exceptions;
+using Net.Shared.Bots.Abstractions.Models.Request;
+using Net.Shared.Bots.Abstractions.Models.Response;
 using Net.Shared.Bots.Abstractions.Models.Settings;
 using Net.Shared.Extensions.Logging;
 
@@ -68,7 +69,7 @@ public sealed class TelegramBotClient(
 
         var result = new InlineKeyboardMarkup(buttonsByColumns);
 
-        await _client.SendTextMessageAsync(args.ChatId, args.Buttons.Name, replyMarkup: result, cancellationToken: cToken);
+        await _client.SendTextMessageAsync(args.Chat.Id, args.Buttons.Name, replyMarkup: result, cancellationToken: cToken);
 
         static List<InlineKeyboardButton[]> CreateByColumns(byte columns, Dictionary<string, string> data)
         {
@@ -86,13 +87,38 @@ public sealed class TelegramBotClient(
             return result;
         }
     }
+    public async Task SendButtons(string chatId, Buttons buttons, CancellationToken cToken)
+    {
+        var buttonsByColumns = CreateByColumns(buttons.Columns, buttons.Data);
+
+        var result = new InlineKeyboardMarkup(buttonsByColumns);
+
+        await _client.SendTextMessageAsync(chatId, buttons.Name, replyMarkup: result, cancellationToken: cToken);
+
+        static List<InlineKeyboardButton[]> CreateByColumns(byte columns, Dictionary<string, string> data)
+        {
+            var rowsCount = (int)MathF.Ceiling(data.Count / (float)columns);
+
+            var result = new List<InlineKeyboardButton[]>(rowsCount);
+
+            for (var i = 0; i < data.Count; i += columns)
+                result.Add(data
+                    .Skip(i)
+                    .Take(columns)
+                    .Select(x => InlineKeyboardButton.WithCallbackData(x.Value, x.Key))
+                    .ToArray());
+
+            return result;
+        }
+    }
+
     public async Task SendWebApp(WebAppEventArgs args, CancellationToken cToken)
     {
         var buttonsByColumns = CreateByColumns(args.WebApp.Columns, args.WebApp.Data);
 
         var result = new InlineKeyboardMarkup(buttonsByColumns);
 
-        await _client.SendTextMessageAsync(args.ChatId, args.WebApp.Name, replyMarkup: result, cancellationToken: cToken);
+        await _client.SendTextMessageAsync(args.Chat.Id, args.WebApp.Name, replyMarkup: result, cancellationToken: cToken);
 
         static List<InlineKeyboardButton[]> CreateByColumns(byte columns, Dictionary<string, Uri> data)
         {
@@ -115,7 +141,11 @@ public sealed class TelegramBotClient(
     }
     public Task SendMessage(MessageEventArgs args, CancellationToken cToken)
     {
-        return _client.SendTextMessageAsync(args.ChatId, args.Message.Text, cancellationToken: cToken);
+        return _client.SendTextMessageAsync(args.Chat.Id, args.Message.Text, cancellationToken: cToken);
+    }
+    public Task SendMessage(string chatId, Abstractions.Models.Response.Message message, CancellationToken cToken)
+    {
+        return _client.SendTextMessageAsync(chatId, message.Text, cancellationToken: cToken);
     }
 
     private async Task HandleReceivedMessage(ITelegramBotClient client, Update? update, CancellationToken cToken)
@@ -135,7 +165,7 @@ public sealed class TelegramBotClient(
                 UpdateType.ChannelPost => HandleMessage(request, update.Message, cToken),
                 UpdateType.EditedChannelPost => HandleMessage(request, update.Message, cToken),
                 UpdateType.CallbackQuery => !string.IsNullOrWhiteSpace(update.CallbackQuery?.Data)
-                    ? OnTextHandler(request, new(new(update.CallbackQuery.From.Id.ToString(), new(update.CallbackQuery.Message.MessageId.ToString())), new(update.CallbackQuery.Data)), cToken)
+                    ? OnTextHandler(request, new(new(update.CallbackQuery.From.Id.ToString(), new(update.CallbackQuery.Id.ToString())), new(update.CallbackQuery.Data)), cToken)
                     : throw new InvalidOperationException("Callback data is required."),
                 _ => throw new NotSupportedException($"Update type {update.Type} is not supported.")
             };
@@ -187,143 +217,33 @@ public sealed class TelegramBotClient(
         return client.SendTextMessageAsync(AdminId, exception.Message, cancellationToken: cToken);
     }
 
-    private async Task OnTextHandler(IBotRequest request, TextEventArgs args, CancellationToken cToken)
+    private Task OnTextHandler(IBotRequest request, TextEventArgs args, CancellationToken cToken) =>
+        OnRequestMessageHandler(request.HandleText, args.Chat, args, cToken);
+    private Task OnPhotoHandler(IBotRequest request, PhotoEventArgs args, CancellationToken cToken) =>
+        OnRequestMessageHandler(request.HandlePhoto, args.Chat, args, cToken);
+    private Task OnAudioHandler(IBotRequest request, AudioEventArgs args, CancellationToken cToken) =>
+        OnRequestMessageHandler(request.HandleAudio, args.Chat, args, cToken);
+    private Task OnVideoHandler(IBotRequest request, VideoEventArgs args, CancellationToken cToken) =>
+        OnRequestMessageHandler(request.HandleVideo, args.Chat, args, cToken);
+    private Task OnVoiceHandler(IBotRequest request, VoiceEventArgs args, CancellationToken cToken) =>
+        OnRequestMessageHandler(request.HandleVoice, args.Chat, args, cToken);
+    private Task OnDocumentHandler(IBotRequest request, DocumentEventArgs args, CancellationToken cToken) =>
+        OnRequestMessageHandler(request.HandleDocument, args.Chat, args, cToken);
+    private Task OnLocationHandler(IBotRequest request, LocationEventArgs args, CancellationToken cToken) =>
+        OnRequestMessageHandler(request.HandleLocation, args.Chat, args, cToken);
+    private Task OnContactHandler(IBotRequest request, ContactEventArgs args, CancellationToken cToken) =>
+        OnRequestMessageHandler(request.HandleContact, args.Chat, args, cToken);
+
+    private async Task OnRequestMessageHandler<T>(Func<T, CancellationToken, Task> handler, Abstractions.Models.Bot.Chat chat, T data, CancellationToken cToken) where T : class
     {
         if (!cToken.IsCancellationRequested)
             try
             {
-                await request.HandleText(args, cToken);
+                await handler(data, cToken);
             }
             catch (BotUserInvalidOperationException exception)
             {
-                await SendMessage(new(args.Chat.Id, new(exception.Message)), cToken);
-                return;
-            }
-            catch
-            {
-                await SendMessage(new(args.Chat.Id, new(Shared.Abstractions.Constants.UserErrorMessage)), cToken);
-                throw;
-            }
-    }
-    private async Task OnPhotoHandler(IBotRequest request, PhotoEventArgs args, CancellationToken cToken)
-    {
-        if (!cToken.IsCancellationRequested)
-            try
-            {
-                await request.HandlePhoto(args, cToken);
-            }
-            catch (BotUserInvalidOperationException exception)
-            {
-                var messageArgs = new MessageEventArgs(args.Chat.Id, new(exception.Message));
-                await SendMessage(messageArgs, cToken);
-                return;
-            }
-            catch
-            {
-                throw;
-            }
-    }
-    private async Task OnAudioHandler(IBotRequest request, AudioEventArgs args, CancellationToken cToken)
-    {
-        if (!cToken.IsCancellationRequested)
-            try
-            {
-                await request.HandleAudio(args, cToken);
-            }
-            catch (BotUserInvalidOperationException exception)
-            {
-                var messageArgs = new MessageEventArgs(args.Chat.Id, new(exception.Message));
-                await SendMessage(messageArgs, cToken);
-                return;
-            }
-            catch
-            {
-                throw;
-            }
-    }
-    private async Task OnVideoHandler(IBotRequest request, VideoEventArgs args, CancellationToken cToken)
-    {
-        if (!cToken.IsCancellationRequested)
-            try
-            {
-                await request.HandleVideo(args, cToken);
-            }
-            catch (BotUserInvalidOperationException exception)
-            {
-                var messageArgs = new MessageEventArgs(args.Chat.Id, new(exception.Message));
-                await SendMessage(messageArgs, cToken);
-                return;
-            }
-            catch
-            {
-                throw;
-            }
-    }
-    private async Task OnVoiceHandler(IBotRequest request, VoiceEventArgs args, CancellationToken cToken)
-    {
-        if (!cToken.IsCancellationRequested)
-            try
-            {
-                await request.HandleVoice(args, cToken);
-            }
-            catch (BotUserInvalidOperationException exception)
-            {
-                var messageArgs = new MessageEventArgs(args.Chat.Id, new(exception.Message));
-                await SendMessage(messageArgs, cToken);
-                return;
-            }
-            catch
-            {
-                throw;
-            }
-    }
-    private async Task OnDocumentHandler(IBotRequest request, DocumentEventArgs args, CancellationToken cToken)
-    {
-        if (!cToken.IsCancellationRequested)
-            try
-            {
-                await request.HandleDocument(args, cToken);
-            }
-            catch (BotUserInvalidOperationException exception)
-            {
-                var messageArgs = new MessageEventArgs(args.Chat.Id, new(exception.Message));
-                await SendMessage(messageArgs, cToken);
-                return;
-            }
-            catch
-            {
-                throw;
-            }
-    }
-    private async Task OnLocationHandler(IBotRequest request, LocationEventArgs args, CancellationToken cToken)
-    {
-        if (!cToken.IsCancellationRequested)
-            try
-            {
-                await request.HandleLocation(args, cToken);
-            }
-            catch (BotUserInvalidOperationException exception)
-            {
-                var messageArgs = new MessageEventArgs(args.Chat.Id, new(exception.Message));
-                await SendMessage(messageArgs, cToken);
-                return;
-            }
-            catch
-            {
-                throw;
-            }
-    }
-    private async Task OnContactHandler(IBotRequest request, ContactEventArgs args, CancellationToken cToken)
-    {
-        if (!cToken.IsCancellationRequested)
-            try
-            {
-                await request.HandleContact(args, cToken);
-            }
-            catch (BotUserInvalidOperationException exception)
-            {
-                var messageArgs = new MessageEventArgs(args.Chat.Id, new(exception.Message));
-                await SendMessage(messageArgs, cToken);
+                await SendMessage(new(chat, new(exception.Message)), cToken);
                 return;
             }
             catch

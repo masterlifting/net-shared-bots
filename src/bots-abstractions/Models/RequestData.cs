@@ -1,4 +1,4 @@
-﻿namespace Net.Shared.Bots.Abstractions.Models;
+﻿namespace Net.Shared.Bots.Abstractions.Models.Request;
 
 public sealed record Text(string Value);
 public sealed record Photo(string FileId, long? FileSize);
