@@ -13,16 +13,16 @@ public static class Registrations
         where TResponse : class, IBotResponse
     {
         services
-            .AddOptions<TelegramBotConnectionSettings>()
+            .AddOptions<BotConnectionSettings>()
             .Configure<IConfiguration>((settings, configuration) =>
             {
                 configuration
-                    .GetSection(TelegramBotConnectionSettings.SectionName)
+                    .GetSection(BotConnectionSettings.SectionName)
                     .Bind(settings);
             })
             .ValidateOnStart()
             .Validate(x => !string.IsNullOrWhiteSpace(x.Token), "Token of Telegram bot should not be empty.")
-            .Validate(x => !string.IsNullOrWhiteSpace(x.AdminChatId), "Admin chat id of Telegram bot should not be empty.");
+            .Validate(x => !string.IsNullOrWhiteSpace(x.AdminId), "Admin chat id of Telegram bot should not be empty.");
 
 
         var botConfiguration = new BotConfiguration(services);

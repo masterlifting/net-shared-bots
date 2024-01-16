@@ -1,17 +1,19 @@
-﻿using Net.Shared.Abstractions.Models.Exceptions;
+﻿using Microsoft.Extensions.Options;
+
 using Net.Shared.Bots.Abstractions.Interfaces;
 using Net.Shared.Bots.Abstractions.Models;
+using Net.Shared.Bots.Abstractions.Models.Settings;
 
 using static Net.Shared.Bots.Abstractions.Constants;
 
 namespace Net.Shared.Bots;
 
 internal sealed class BotRequest(
-    IBotClient botClient,
+    IOptions<BotConnectionSettings> options,
     IBotCommandsStore botCommandsStore,
     IBotResponse botResponse) : IBotRequest
 {
-    private readonly IBotClient _botClient = botClient;
+    private readonly BotConnectionSettings _settings = options.Value;
     private readonly IBotCommandsStore _botCommandsStore = botCommandsStore;
     private readonly IBotResponse _botResponse = botResponse;
 
@@ -44,23 +46,7 @@ internal sealed class BotRequest(
 
             var command = await _botCommandsStore.Create(args.Chat.Id, commandName, commandParameters, cToken);
 
-            try
-            {
-                await _botResponse.Create(args.Chat.Id, command, cToken);
-            }
-            catch (UserInvalidOperationException exception)
-            {
-                var messageArgs = new MessageEventArgs(args.Chat.Id, new(exception.Message));
-                await _botClient.SendMessage(messageArgs, cToken);
-                return;
-            }
-            catch
-            {
-                var messageArgs = new MessageEventArgs(args.Chat.Id, new(Shared.Abstractions.Constants.UserErrorMessage));
-                await _botClient.SendMessage(messageArgs, cToken);
-
-                throw;
-            }
+            await _botResponse.Create(args.Chat.Id, command, cToken);
 
         }
         else if (args.Text.Value.StartsWith('\"') && args.Text.Value.EndsWith('\"'))
@@ -73,32 +59,15 @@ internal sealed class BotRequest(
             {
                 { CommandParameters.Message, text }
             };
-            
-            var command = await _botCommandsStore.Create(args.Chat.AdminId, commandName, commandParameters, cToken);
 
-            await _botResponse.Create(args.Chat.AdminId, command, cToken);
+            var command = await _botCommandsStore.Create(_settings.AdminId, commandName, commandParameters, cToken);
+
+            await _botResponse.Create(_settings.AdminId, command, cToken);
         }
         else if (Guid.TryParse(args.Text.Value, out var guid))
         {
             var command = await _botCommandsStore.Get(args.Chat.Id, guid, cToken);
-
-            try
-            {
-                await _botResponse.Create(args.Chat.Id, command, cToken);
-            }
-            catch (UserInvalidOperationException exception)
-            {
-                var messageArgs = new MessageEventArgs(args.Chat.Id, new(exception.Message));
-                await _botClient.SendMessage(messageArgs, cToken);
-                return;
-            }
-            catch
-            {
-                var messageArgs = new MessageEventArgs(args.Chat.Id, new(Shared.Abstractions.Constants.UserErrorMessage));
-                await _botClient.SendMessage(messageArgs, cToken);
-
-                throw;
-            }
+            await _botResponse.Create(args.Chat.Id, command, cToken);
         }
         else
             throw new NotSupportedException($"The message '{args.Text.Value}' is not supported.");

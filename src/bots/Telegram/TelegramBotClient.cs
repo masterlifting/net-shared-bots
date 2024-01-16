@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 
 using Net.Shared.Bots.Abstractions.Interfaces;
 using Net.Shared.Bots.Abstractions.Models;
+using Net.Shared.Bots.Abstractions.Models.Exceptions;
 using Net.Shared.Bots.Abstractions.Models.Settings;
 using Net.Shared.Extensions.Logging;
 
@@ -23,14 +24,14 @@ namespace Net.Shared.Bots.Telegram;
 
 public sealed class TelegramBotClient(
     ILogger<TelegramBotClient> logger,
-    IOptions<TelegramBotConnectionSettings> options,
+    IOptions<BotConnectionSettings> options,
     IServiceScopeFactory scopeFactory) : IBotClient
 {
     private readonly ILogger _log = logger;
     private readonly IServiceScopeFactory _scopeFactory = scopeFactory;
     private readonly ITelegramBotClient _client = new ExternalTelegramBotClient(options.Value.Token);
 
-    public string AdminChatId => options.Value.AdminChatId;
+    public string AdminId => options.Value.AdminId;
 
     public async Task Listen(Uri uri, CancellationToken cToken)
     {
@@ -60,7 +61,7 @@ public sealed class TelegramBotClient(
         var file = await _client.GetInfoAndDownloadFileAsync(fileId, stream, cancellationToken: cToken);
         return stream.ToArray();
     }
-    
+
     public async Task SendButtons(ButtonsEventArgs args, CancellationToken cToken)
     {
         var buttonsByColumns = CreateByColumns(args.Buttons.Columns, args.Buttons.Data);
@@ -129,12 +130,12 @@ public sealed class TelegramBotClient(
 
             var result = update.Type switch
             {
-                UpdateType.Message => HandleMessage(request, update.Message, AdminChatId, cToken),
-                UpdateType.EditedMessage => HandleMessage(request, update.Message, AdminChatId, cToken),
-                UpdateType.ChannelPost => HandleMessage(request, update.Message, AdminChatId, cToken),
-                UpdateType.EditedChannelPost => HandleMessage(request, update.Message, AdminChatId, cToken),
+                UpdateType.Message => HandleMessage(request, update.Message, cToken),
+                UpdateType.EditedMessage => HandleMessage(request, update.Message, cToken),
+                UpdateType.ChannelPost => HandleMessage(request, update.Message, cToken),
+                UpdateType.EditedChannelPost => HandleMessage(request, update.Message, cToken),
                 UpdateType.CallbackQuery => !string.IsNullOrWhiteSpace(update.CallbackQuery?.Data)
-                    ? OnTextHandler(request, new(new(update.CallbackQuery.From.Id.ToString(), AdminChatId), new(update.CallbackQuery.Data)), cToken)
+                    ? OnTextHandler(request, new(new(update.CallbackQuery.From.Id.ToString(), new(update.CallbackQuery.Message.MessageId.ToString())), new(update.CallbackQuery.Data)), cToken)
                     : throw new InvalidOperationException("Callback data is required."),
                 _ => throw new NotSupportedException($"Update type {update.Type} is not supported.")
             };
@@ -146,35 +147,35 @@ public sealed class TelegramBotClient(
             await HandleReceivedMessageError(client, exception, cToken);
         }
 
-        static Task HandleMessage(IBotRequest request, Message? message, string AdminChatId, CancellationToken cToken)
+        Task HandleMessage(IBotRequest request, Message? message, CancellationToken cToken)
         {
             ArgumentNullException.ThrowIfNull(message, "Received data was not recognized.");
 
             return message.Type switch
             {
                 MessageType.Text => !string.IsNullOrWhiteSpace(message.Text)
-                    ? OnTextHandler(request, new(new(message.Chat.Id.ToString(), AdminChatId), new(message.Text)), cToken)
+                    ? OnTextHandler(request, new(new(message.Chat.Id.ToString(), new(message.MessageId.ToString())), new(message.Text)), cToken)
                     : throw new InvalidOperationException("Text is required."),
                 MessageType.Photo => message.Photo is not null
-                    ? OnPhotoHandler(request, new(new(message.Chat.Id.ToString(), AdminChatId), message.Photo.Select(x => new Photo(x.FileId, x.FileSize)).ToImmutableArray()), cToken)
+                    ? OnPhotoHandler(request, new(new(message.Chat.Id.ToString(), new(message.MessageId.ToString())), message.Photo.Select(x => new Photo(x.FileId, x.FileSize)).ToImmutableArray()), cToken)
                     : throw new InvalidOperationException("Photo is required."),
                 MessageType.Audio => message.Audio is not null
-                    ? OnAudioHandler(request, new(new(message.Chat.Id.ToString(), AdminChatId), new(message.Audio.FileId, message.Audio.FileSize, message.Audio.Title, message.Audio.MimeType)), cToken)
+                    ? OnAudioHandler(request, new(new(message.Chat.Id.ToString(), new(message.MessageId.ToString())), new(message.Audio.FileId, message.Audio.FileSize, message.Audio.Title, message.Audio.MimeType)), cToken)
                     : throw new InvalidOperationException("Audio is required."),
                 MessageType.Video => message.Video is not null
-                    ? OnVideoHandler(request, new(new(message.Chat.Id.ToString(), AdminChatId), new(message.Video.FileId, message.Video.FileSize, message.Video.FileName, message.Video.MimeType)), cToken)
+                    ? OnVideoHandler(request, new(new(message.Chat.Id.ToString(), new(message.MessageId.ToString())), new(message.Video.FileId, message.Video.FileSize, message.Video.FileName, message.Video.MimeType)), cToken)
                     : throw new InvalidOperationException("Video is required."),
                 MessageType.Voice => message.Voice is not null
-                    ? OnVoiceHandler(request, new(new(message.Chat.Id.ToString(), AdminChatId), new(message.Voice.FileId, message.Voice.FileSize, message.Voice.MimeType)), cToken)
+                    ? OnVoiceHandler(request, new(new(message.Chat.Id.ToString(), new(message.MessageId.ToString())), new(message.Voice.FileId, message.Voice.FileSize, message.Voice.MimeType)), cToken)
                     : throw new InvalidOperationException("Voice is required."),
                 MessageType.Document => message.Document is not null
-                    ? OnDocumentHandler(request, new(new(message.Chat.Id.ToString(), AdminChatId), new(message.Document.FileId, message.Document.FileSize, message.Document.FileName, message.Document.MimeType)), cToken)
+                    ? OnDocumentHandler(request, new(new(message.Chat.Id.ToString(), new(message.MessageId.ToString())), new(message.Document.FileId, message.Document.FileSize, message.Document.FileName, message.Document.MimeType)), cToken)
                     : throw new InvalidOperationException("Document is required."),
                 MessageType.Location => message.Location is not null
-                    ? OnLocationHandler(request, new(new(message.Chat.Id.ToString(), AdminChatId), new(message.Location.Latitude, message.Location.Longitude)), cToken)
+                    ? OnLocationHandler(request, new(new(message.Chat.Id.ToString(), new(message.MessageId.ToString())), new(message.Location.Latitude, message.Location.Longitude)), cToken)
                     : throw new InvalidOperationException("Location is required."),
                 MessageType.Contact => message.Contact is not null
-                    ? OnContactHandler(request, new(new(message.Chat.Id.ToString(), AdminChatId), new(message.Contact.PhoneNumber, message.Contact.FirstName, message.Contact.LastName)), cToken)
+                    ? OnContactHandler(request, new(new(message.Chat.Id.ToString(), new(message.MessageId.ToString())), new(message.Contact.PhoneNumber, message.Contact.FirstName, message.Contact.LastName)), cToken)
                     : throw new InvalidOperationException("Contact is required."),
                 _ => throw new NotSupportedException($"Message type {message.Type} is not supported.")
             };
@@ -183,39 +184,151 @@ public sealed class TelegramBotClient(
     private Task HandleReceivedMessageError(ITelegramBotClient client, Exception exception, CancellationToken cToken)
     {
         _log.ErrorCompact(exception);
-        return client.SendTextMessageAsync(AdminChatId, exception.Message, cancellationToken: cToken);
+        return client.SendTextMessageAsync(AdminId, exception.Message, cancellationToken: cToken);
     }
 
-    private static Task OnTextHandler(IBotRequest request, TextEventArgs args, CancellationToken cToken) =>
-        !cToken.IsCancellationRequested
-            ? request.HandleText(args, cToken)
-            : Task.CompletedTask;
-    private static Task OnPhotoHandler(IBotRequest request, PhotoEventArgs args, CancellationToken cToken) =>
-        !cToken.IsCancellationRequested
-            ? request.HandlePhoto(args, cToken)
-            : Task.CompletedTask;
-    private static Task OnAudioHandler(IBotRequest request, AudioEventArgs args, CancellationToken cToken) =>
-        !cToken.IsCancellationRequested
-            ? request.HandleAudio(args, cToken)
-            : Task.CompletedTask;
-    private static Task OnVideoHandler(IBotRequest request, VideoEventArgs args, CancellationToken cToken) =>
-        !cToken.IsCancellationRequested
-            ? request.HandleVideo(args, cToken)
-            : Task.CompletedTask;
-    private static Task OnVoiceHandler(IBotRequest request, VoiceEventArgs args, CancellationToken cToken) =>
-        !cToken.IsCancellationRequested
-            ? request.HandleVoice(args, cToken)
-            : Task.CompletedTask;
-    private static Task OnDocumentHandler(IBotRequest request, DocumentEventArgs args, CancellationToken cToken) =>
-        !cToken.IsCancellationRequested
-            ? request.HandleDocument(args, cToken)
-            : Task.CompletedTask;
-    private static Task OnLocationHandler(IBotRequest request, LocationEventArgs args, CancellationToken cToken) =>
-        !cToken.IsCancellationRequested
-            ? request.HandleLocation(args, cToken)
-            : Task.CompletedTask;
-    private static Task OnContactHandler(IBotRequest request, ContactEventArgs args, CancellationToken cToken) =>
-        !cToken.IsCancellationRequested
-            ? request.HandleContact(args, cToken)
-            : Task.CompletedTask;
+    private async Task OnTextHandler(IBotRequest request, TextEventArgs args, CancellationToken cToken)
+    {
+        if (!cToken.IsCancellationRequested)
+            try
+            {
+                await request.HandleText(args, cToken);
+            }
+            catch (BotUserInvalidOperationException exception)
+            {
+                await SendMessage(new(args.Chat.Id, new(exception.Message)), cToken);
+                return;
+            }
+            catch
+            {
+                await SendMessage(new(args.Chat.Id, new(Shared.Abstractions.Constants.UserErrorMessage)), cToken);
+                throw;
+            }
+    }
+    private async Task OnPhotoHandler(IBotRequest request, PhotoEventArgs args, CancellationToken cToken)
+    {
+        if (!cToken.IsCancellationRequested)
+            try
+            {
+                await request.HandlePhoto(args, cToken);
+            }
+            catch (BotUserInvalidOperationException exception)
+            {
+                var messageArgs = new MessageEventArgs(args.Chat.Id, new(exception.Message));
+                await SendMessage(messageArgs, cToken);
+                return;
+            }
+            catch
+            {
+                throw;
+            }
+    }
+    private async Task OnAudioHandler(IBotRequest request, AudioEventArgs args, CancellationToken cToken)
+    {
+        if (!cToken.IsCancellationRequested)
+            try
+            {
+                await request.HandleAudio(args, cToken);
+            }
+            catch (BotUserInvalidOperationException exception)
+            {
+                var messageArgs = new MessageEventArgs(args.Chat.Id, new(exception.Message));
+                await SendMessage(messageArgs, cToken);
+                return;
+            }
+            catch
+            {
+                throw;
+            }
+    }
+    private async Task OnVideoHandler(IBotRequest request, VideoEventArgs args, CancellationToken cToken)
+    {
+        if (!cToken.IsCancellationRequested)
+            try
+            {
+                await request.HandleVideo(args, cToken);
+            }
+            catch (BotUserInvalidOperationException exception)
+            {
+                var messageArgs = new MessageEventArgs(args.Chat.Id, new(exception.Message));
+                await SendMessage(messageArgs, cToken);
+                return;
+            }
+            catch
+            {
+                throw;
+            }
+    }
+    private async Task OnVoiceHandler(IBotRequest request, VoiceEventArgs args, CancellationToken cToken)
+    {
+        if (!cToken.IsCancellationRequested)
+            try
+            {
+                await request.HandleVoice(args, cToken);
+            }
+            catch (BotUserInvalidOperationException exception)
+            {
+                var messageArgs = new MessageEventArgs(args.Chat.Id, new(exception.Message));
+                await SendMessage(messageArgs, cToken);
+                return;
+            }
+            catch
+            {
+                throw;
+            }
+    }
+    private async Task OnDocumentHandler(IBotRequest request, DocumentEventArgs args, CancellationToken cToken)
+    {
+        if (!cToken.IsCancellationRequested)
+            try
+            {
+                await request.HandleDocument(args, cToken);
+            }
+            catch (BotUserInvalidOperationException exception)
+            {
+                var messageArgs = new MessageEventArgs(args.Chat.Id, new(exception.Message));
+                await SendMessage(messageArgs, cToken);
+                return;
+            }
+            catch
+            {
+                throw;
+            }
+    }
+    private async Task OnLocationHandler(IBotRequest request, LocationEventArgs args, CancellationToken cToken)
+    {
+        if (!cToken.IsCancellationRequested)
+            try
+            {
+                await request.HandleLocation(args, cToken);
+            }
+            catch (BotUserInvalidOperationException exception)
+            {
+                var messageArgs = new MessageEventArgs(args.Chat.Id, new(exception.Message));
+                await SendMessage(messageArgs, cToken);
+                return;
+            }
+            catch
+            {
+                throw;
+            }
+    }
+    private async Task OnContactHandler(IBotRequest request, ContactEventArgs args, CancellationToken cToken)
+    {
+        if (!cToken.IsCancellationRequested)
+            try
+            {
+                await request.HandleContact(args, cToken);
+            }
+            catch (BotUserInvalidOperationException exception)
+            {
+                var messageArgs = new MessageEventArgs(args.Chat.Id, new(exception.Message));
+                await SendMessage(messageArgs, cToken);
+                return;
+            }
+            catch
+            {
+                throw;
+            }
+    }
 }
