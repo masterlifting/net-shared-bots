@@ -67,7 +67,8 @@ internal sealed class BotRequest(
         else if (Guid.TryParse(args.Text.Value, out var guid))
         {
             var command = await _botCommandsStore.Get(args.Chat.Id, guid, cToken);
-            await _botResponse.Create(args.Chat.Id, command, cToken);
+
+            await _botResponse.Create(args.Chat, command, cToken);
         }
         else
             throw new NotSupportedException($"The message '{args.Text.Value}' is not supported.");
