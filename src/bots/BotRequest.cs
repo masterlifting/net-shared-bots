@@ -44,7 +44,7 @@ internal sealed class BotRequest(
                 }
             }
 
-            var command = await _botCommandsStore.Create(args.Chat.Id, commandName, commandParameters, cToken);
+            var command = new Abstractions.Models.Bot.Command(Guid.NewGuid(), commandName, commandParameters);
 
             await _botResponse.Create(args.Chat, command, cToken);
 
@@ -60,7 +60,7 @@ internal sealed class BotRequest(
                 { CommandParameters.Message, text }
             };
 
-            var command = await _botCommandsStore.Create(_settings.AdminId, commandName, commandParameters, cToken);
+            var command = new Abstractions.Models.Bot.Command(Guid.NewGuid(), commandName, commandParameters);   
 
             await _botResponse.Create(_settings.AdminId, command, cToken);
         }

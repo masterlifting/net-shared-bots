@@ -9,22 +9,26 @@ public sealed class BotCommandsCache : IBotCommandsStore
 {
     private readonly ConcurrentDictionary<string, Dictionary<Guid, Command>> _storage = new();
 
-    public Task<Command> Create(string chatId, string Name, Dictionary<string, string> Parameters, CancellationToken cToken)
+    public Task Create(string chatId, Command command, CancellationToken cToken)
     {
-        var commandId = Guid.NewGuid();
-
-        var command = new Command(commandId, Name, Parameters);
-
-        if(_storage.TryGetValue(chatId, out var commands))
+        if (_storage.TryGetValue(chatId, out var commands))
         {
-            commands[commandId] = commands.ContainsKey(commandId)
-                ? throw new InvalidOperationException($"The command '{commandId}' for chat '{chatId}' already exists.")
+            commands[command.Id] = commands.ContainsKey(command.Id)
+                ? throw new InvalidOperationException($"The command '{command.Id}' for chat '{chatId}' already exists.")
                 : command;
         }
         else
-            _storage.TryAdd(chatId, new Dictionary<Guid, Command> { { commandId, command } });
-        
-        return Task.FromResult(command);
+            _storage.TryAdd(chatId, new Dictionary<Guid, Command> { { command.Id, command } });
+
+        return Task.CompletedTask;
+    }
+    public async Task<Command> Create(string chatId, string Name, Dictionary<string, string> Parameters, CancellationToken cToken)
+    {
+        var command = new Command(Guid.NewGuid(), Name, Parameters);
+
+        await Create(chatId, command, cToken);
+
+        return command;
     }
     public Task Update(string chatId, Guid commandId, Command command, CancellationToken cToken)
     {
@@ -69,4 +73,5 @@ public sealed class BotCommandsCache : IBotCommandsStore
         Task.FromResult(_storage.TryGetValue(chatId, out var commands)
             ? [.. commands.Values]
             : Array.Empty<Command>());
+
 }
