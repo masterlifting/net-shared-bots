@@ -4,7 +4,7 @@ using Net.Shared.Bots.Abstractions.Interfaces;
 
 namespace Net.Shared.Bots;
 
-public class BotConfiguration(IServiceCollection services)
+public sealed class BotConfiguration(IServiceCollection services)
 {
     private readonly IServiceCollection _services = services;
 

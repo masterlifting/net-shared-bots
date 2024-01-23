@@ -9,7 +9,7 @@ namespace Net.Shared.Bots;
 
 public static class Registrations
 {
-    public static IServiceCollection AddTelegramBot<TResponse>(this IServiceCollection services, Action<BotConfiguration> configure)
+    public static IServiceCollection AddTelegramBot<TResponse>(this IServiceCollection services, Action<BotConfiguration>? configure = null)
         where TResponse : class, IBotResponse
     {
         services
@@ -27,7 +27,7 @@ public static class Registrations
 
         var botConfiguration = new BotConfiguration(services);
 
-        configure(botConfiguration);
+        configure?.Invoke(botConfiguration);
 
         switch (botConfiguration.ClientLifetime)
         {

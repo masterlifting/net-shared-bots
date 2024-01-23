@@ -5,8 +5,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
+using Net.Shared.Abstractions.Models.Exceptions;
 using Net.Shared.Bots.Abstractions.Interfaces;
-using Net.Shared.Bots.Abstractions.Models.Exceptions;
 using Net.Shared.Bots.Abstractions.Models.Request;
 using Net.Shared.Bots.Abstractions.Models.Response;
 using Net.Shared.Bots.Abstractions.Models.Settings;
@@ -243,7 +243,7 @@ public sealed class TelegramBotClient(
             {
                 await handler(data, cToken);
             }
-            catch (BotUserInvalidOperationException exception)
+            catch (UserInvalidOperationException exception)
             {
                 await SendMessage(new(chat, new(exception.Message)), cToken);
                 return;
