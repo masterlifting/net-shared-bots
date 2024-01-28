@@ -6,14 +6,14 @@ namespace Net.Shared.Bots;
 
 public sealed class BotConfiguration(IServiceCollection services)
 {
-    private readonly IServiceCollection _services = services;
+    public IServiceCollection Services { get; } = services;
 
     public ServiceLifetime ClientLifetime { get; init; } = ServiceLifetime.Singleton;
     internal bool IsSetCommandsStore { get; private set; }
 
     public void AddCommandsStore<T>() where T : class, IBotCommandsStore
     {
-        _services.AddTransient<IBotCommandsStore, T>();
+        Services.AddTransient<IBotCommandsStore, T>();
         IsSetCommandsStore = true;
     }
 }
