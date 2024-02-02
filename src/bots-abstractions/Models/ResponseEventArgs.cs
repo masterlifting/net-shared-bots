@@ -2,6 +2,5 @@
 
 namespace Net.Shared.Bots.Abstractions.Models.Response;
 
-public sealed record MessageEventArgs(Chat Chat, Message Message);
-public sealed record ButtonsEventArgs(Chat Chat, Buttons Buttons);
-public sealed record WebAppEventArgs(Chat Chat, WebApp WebApp);
+public sealed record ButtonsEventArgs(Message Message, Buttons Buttons);
+public sealed record WebAppEventArgs(Message Message, WebApp WebApp);

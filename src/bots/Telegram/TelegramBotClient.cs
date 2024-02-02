@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 
 using Net.Shared.Abstractions.Models.Exceptions;
 using Net.Shared.Bots.Abstractions.Interfaces;
+using Net.Shared.Bots.Abstractions.Models.Bot;
 using Net.Shared.Bots.Abstractions.Models.Request;
 using Net.Shared.Bots.Abstractions.Models.Response;
 using Net.Shared.Bots.Abstractions.Models.Settings;
@@ -63,15 +64,38 @@ public sealed class TelegramBotClient(
         return stream.ToArray();
     }
 
-    public async Task SendButtons(ButtonsEventArgs args, CancellationToken cToken)
+    public async Task<Result> SendText(TextEventArgs args, CancellationToken cToken)
     {
-        var buttonsByColumns = CreateByColumns(args.Buttons.Columns, args.Buttons.Data);
+        var response = args.Message.Id.HasValue
+            ? await _client.SendTextMessageAsync(args.Message.Chat.Id, args.Text.Value, replyToMessageId: args.Message.Id.Value, cancellationToken: cToken)
+            : await _client.SendTextMessageAsync(args.Message.Chat.Id, args.Text.Value, cancellationToken: cToken);
 
-        var result = new InlineKeyboardMarkup(buttonsByColumns);
+        return new(new(response.MessageId, new(args.Message.Chat.Id)));
 
-        await _client.SendTextMessageAsync(args.Chat.Id, args.Buttons.Name, replyMarkup: result, cancellationToken: cToken);
+    }
+    public async Task<Result> SendButtons(ButtonsEventArgs args, CancellationToken cToken)
+    {
+        var columnsCount = args.Buttons.Columns != 0
+            ? args.Buttons.Columns
+            : args.Buttons.Data.Count % 4 == 0
+                ? 4
+                : args.Buttons.Data.Count % 3 == 0
+                    ? 3
+                    : args.Buttons.Data.Count % 2 == 0
+                        ? 2
+                        : 1;
 
-        static List<InlineKeyboardButton[]> CreateByColumns(byte columns, Dictionary<string, string> data)
+        var buttonsByColumns = CreateByColumns(columnsCount, args.Buttons.Data);
+
+        var request = new InlineKeyboardMarkup(buttonsByColumns);
+
+        var response = args.Message.Id.HasValue
+            ? await _client.SendTextMessageAsync(args.Message.Chat.Id, args.Buttons.Name, replyToMessageId: args.Message.Id.Value, replyMarkup: request, cancellationToken: cToken)
+            : await _client.SendTextMessageAsync(args.Message.Chat.Id, args.Buttons.Name, replyMarkup: request, cancellationToken: cToken);
+
+        return new(new(response.MessageId, new(args.Message.Chat.Id)));
+
+        static List<InlineKeyboardButton[]> CreateByColumns(int columns, Dictionary<string, string> data)
         {
             var rowsCount = (int)MathF.Ceiling(data.Count / (float)columns);
 
@@ -87,40 +111,29 @@ public sealed class TelegramBotClient(
             return result;
         }
     }
-    public async Task SendButtons(string chatId, Buttons buttons, CancellationToken cToken)
+    public async Task<Result> SendWebApp(WebAppEventArgs args, CancellationToken cToken)
     {
-        var buttonsByColumns = CreateByColumns(buttons.Columns, buttons.Data);
+        var columnsCount = args.WebApp.Columns != 0
+            ? args.WebApp.Columns
+            : args.WebApp.Data.Count % 4 == 0
+                ? 4
+                : args.WebApp.Data.Count % 3 == 0
+                    ? 3
+                    : args.WebApp.Data.Count % 2 == 0
+                        ? 2
+                        : 1;
 
-        var result = new InlineKeyboardMarkup(buttonsByColumns);
+        var buttonsByColumns = CreateByColumns(columnsCount, args.WebApp.Data);
 
-        await _client.SendTextMessageAsync(chatId, buttons.Name, replyMarkup: result, cancellationToken: cToken);
+        var request = new InlineKeyboardMarkup(buttonsByColumns);
 
-        static List<InlineKeyboardButton[]> CreateByColumns(byte columns, Dictionary<string, string> data)
-        {
-            var rowsCount = (int)MathF.Ceiling(data.Count / (float)columns);
+        var response = args.Message.Id.HasValue
+            ? await _client.SendTextMessageAsync(args.Message.Chat.Id, args.WebApp.Name, replyToMessageId: args.Message.Id.Value, replyMarkup: request, cancellationToken: cToken)
+            : await _client.SendTextMessageAsync(args.Message.Chat.Id, args.WebApp.Name, replyMarkup: request, cancellationToken: cToken);
 
-            var result = new List<InlineKeyboardButton[]>(rowsCount);
+        return new(new(response.MessageId, new(args.Message.Chat.Id)));
 
-            for (var i = 0; i < data.Count; i += columns)
-                result.Add(data
-                    .Skip(i)
-                    .Take(columns)
-                    .Select(x => InlineKeyboardButton.WithCallbackData(x.Value, x.Key))
-                    .ToArray());
-
-            return result;
-        }
-    }
-
-    public async Task SendWebApp(WebAppEventArgs args, CancellationToken cToken)
-    {
-        var buttonsByColumns = CreateByColumns(args.WebApp.Columns, args.WebApp.Data);
-
-        var result = new InlineKeyboardMarkup(buttonsByColumns);
-
-        await _client.SendTextMessageAsync(args.Chat.Id, args.WebApp.Name, replyMarkup: result, cancellationToken: cToken);
-
-        static List<InlineKeyboardButton[]> CreateByColumns(byte columns, Dictionary<string, Uri> data)
+        static List<InlineKeyboardButton[]> CreateByColumns(int columns, Dictionary<string, Uri> data)
         {
             var rowsCount = (int)MathF.Ceiling(data.Count / (float)columns);
 
@@ -138,14 +151,6 @@ public sealed class TelegramBotClient(
 
             return result;
         }
-    }
-    public Task SendMessage(MessageEventArgs args, CancellationToken cToken)
-    {
-        return _client.SendTextMessageAsync(args.Chat.Id, args.Message.Text, cancellationToken: cToken);
-    }
-    public Task SendMessage(string chatId, Abstractions.Models.Response.Message message, CancellationToken cToken)
-    {
-        return _client.SendTextMessageAsync(chatId, message.Text, cancellationToken: cToken);
     }
 
     private async Task HandleReceivedMessage(ITelegramBotClient client, Update? update, CancellationToken cToken)
@@ -165,7 +170,7 @@ public sealed class TelegramBotClient(
                 UpdateType.ChannelPost => HandleMessage(request, update.Message, cToken),
                 UpdateType.EditedChannelPost => HandleMessage(request, update.Message, cToken),
                 UpdateType.CallbackQuery => !string.IsNullOrWhiteSpace(update.CallbackQuery?.Data)
-                    ? OnTextHandler(request, new(new(update.CallbackQuery.From.Id.ToString(), new(update.CallbackQuery.Id.ToString())), new(update.CallbackQuery.Data)), cToken)
+                    ? OnTextHandler(request, new(new(update.CallbackQuery.Message?.MessageId, new(update.CallbackQuery.From.Id.ToString())), new(update.CallbackQuery.Data)), cToken)
                     : throw new InvalidOperationException("Callback data is required."),
                 _ => throw new NotSupportedException($"Update type {update.Type} is not supported.")
             };
@@ -184,28 +189,28 @@ public sealed class TelegramBotClient(
             return message.Type switch
             {
                 MessageType.Text => !string.IsNullOrWhiteSpace(message.Text)
-                    ? OnTextHandler(request, new(new(message.Chat.Id.ToString(), new(message.MessageId.ToString())), new(message.Text)), cToken)
+                    ? OnTextHandler(request, new(new(message.MessageId, new(message.Chat.Id.ToString())), new(message.Text)), cToken)
                     : throw new InvalidOperationException("Text is required."),
                 MessageType.Photo => message.Photo is not null
-                    ? OnPhotoHandler(request, new(new(message.Chat.Id.ToString(), new(message.MessageId.ToString())), message.Photo.Select(x => new Photo(x.FileId, x.FileSize)).ToImmutableArray()), cToken)
+                    ? OnPhotoHandler(request, new(new(message.MessageId, new(message.Chat.Id.ToString())), message.Photo.Select(x => new Photo(x.FileId, x.FileSize)).ToImmutableArray()), cToken)
                     : throw new InvalidOperationException("Photo is required."),
                 MessageType.Audio => message.Audio is not null
-                    ? OnAudioHandler(request, new(new(message.Chat.Id.ToString(), new(message.MessageId.ToString())), new(message.Audio.FileId, message.Audio.FileSize, message.Audio.Title, message.Audio.MimeType)), cToken)
+                    ? OnAudioHandler(request, new(new(message.MessageId, new(message.Chat.Id.ToString())), new(message.Audio.FileId, message.Audio.FileSize, message.Audio.Title, message.Audio.MimeType)), cToken)
                     : throw new InvalidOperationException("Audio is required."),
                 MessageType.Video => message.Video is not null
-                    ? OnVideoHandler(request, new(new(message.Chat.Id.ToString(), new(message.MessageId.ToString())), new(message.Video.FileId, message.Video.FileSize, message.Video.FileName, message.Video.MimeType)), cToken)
+                    ? OnVideoHandler(request, new(new(message.MessageId, new(message.Chat.Id.ToString())), new(message.Video.FileId, message.Video.FileSize, message.Video.FileName, message.Video.MimeType)), cToken)
                     : throw new InvalidOperationException("Video is required."),
                 MessageType.Voice => message.Voice is not null
-                    ? OnVoiceHandler(request, new(new(message.Chat.Id.ToString(), new(message.MessageId.ToString())), new(message.Voice.FileId, message.Voice.FileSize, message.Voice.MimeType)), cToken)
+                    ? OnVoiceHandler(request, new(new(message.MessageId, new(message.Chat.Id.ToString())), new(message.Voice.FileId, message.Voice.FileSize, message.Voice.MimeType)), cToken)
                     : throw new InvalidOperationException("Voice is required."),
                 MessageType.Document => message.Document is not null
-                    ? OnDocumentHandler(request, new(new(message.Chat.Id.ToString(), new(message.MessageId.ToString())), new(message.Document.FileId, message.Document.FileSize, message.Document.FileName, message.Document.MimeType)), cToken)
+                    ? OnDocumentHandler(request, new(new(message.MessageId, new(message.Chat.Id.ToString())), new(message.Document.FileId, message.Document.FileSize, message.Document.FileName, message.Document.MimeType)), cToken)
                     : throw new InvalidOperationException("Document is required."),
                 MessageType.Location => message.Location is not null
-                    ? OnLocationHandler(request, new(new(message.Chat.Id.ToString(), new(message.MessageId.ToString())), new(message.Location.Latitude, message.Location.Longitude)), cToken)
+                    ? OnLocationHandler(request, new(new(message.MessageId, new(message.Chat.Id.ToString())), new(message.Location.Latitude, message.Location.Longitude)), cToken)
                     : throw new InvalidOperationException("Location is required."),
                 MessageType.Contact => message.Contact is not null
-                    ? OnContactHandler(request, new(new(message.Chat.Id.ToString(), new(message.MessageId.ToString())), new(message.Contact.PhoneNumber, message.Contact.FirstName, message.Contact.LastName)), cToken)
+                    ? OnContactHandler(request, new(new(message.MessageId, new(message.Chat.Id.ToString())), new(message.Contact.PhoneNumber, message.Contact.FirstName, message.Contact.LastName)), cToken)
                     : throw new InvalidOperationException("Contact is required."),
                 _ => throw new NotSupportedException($"Message type {message.Type} is not supported.")
             };
@@ -220,23 +225,23 @@ public sealed class TelegramBotClient(
     }
 
     private Task OnTextHandler(IBotRequest request, TextEventArgs args, CancellationToken cToken) =>
-        OnRequestMessageHandler(request.HandleText, args.Chat, args, cToken);
+        OnRequestMessageHandler(request.HandleText, args.Message, args, cToken);
     private Task OnPhotoHandler(IBotRequest request, PhotoEventArgs args, CancellationToken cToken) =>
-        OnRequestMessageHandler(request.HandlePhoto, args.Chat, args, cToken);
+        OnRequestMessageHandler(request.HandlePhoto, args.Message, args, cToken);
     private Task OnAudioHandler(IBotRequest request, AudioEventArgs args, CancellationToken cToken) =>
-        OnRequestMessageHandler(request.HandleAudio, args.Chat, args, cToken);
+        OnRequestMessageHandler(request.HandleAudio, args.Message, args, cToken);
     private Task OnVideoHandler(IBotRequest request, VideoEventArgs args, CancellationToken cToken) =>
-        OnRequestMessageHandler(request.HandleVideo, args.Chat, args, cToken);
+        OnRequestMessageHandler(request.HandleVideo, args.Message, args, cToken);
     private Task OnVoiceHandler(IBotRequest request, VoiceEventArgs args, CancellationToken cToken) =>
-        OnRequestMessageHandler(request.HandleVoice, args.Chat, args, cToken);
+        OnRequestMessageHandler(request.HandleVoice, args.Message, args, cToken);
     private Task OnDocumentHandler(IBotRequest request, DocumentEventArgs args, CancellationToken cToken) =>
-        OnRequestMessageHandler(request.HandleDocument, args.Chat, args, cToken);
+        OnRequestMessageHandler(request.HandleDocument, args.Message, args, cToken);
     private Task OnLocationHandler(IBotRequest request, LocationEventArgs args, CancellationToken cToken) =>
-        OnRequestMessageHandler(request.HandleLocation, args.Chat, args, cToken);
+        OnRequestMessageHandler(request.HandleLocation, args.Message, args, cToken);
     private Task OnContactHandler(IBotRequest request, ContactEventArgs args, CancellationToken cToken) =>
-        OnRequestMessageHandler(request.HandleContact, args.Chat, args, cToken);
+        OnRequestMessageHandler(request.HandleContact, args.Message, args, cToken);
 
-    private async Task OnRequestMessageHandler<T>(Func<T, CancellationToken, Task> handler, Abstractions.Models.Bot.Chat chat, T data, CancellationToken cToken) where T : class
+    private async Task OnRequestMessageHandler<T>(Func<T, CancellationToken, Task> handler, Abstractions.Models.Bot.Message message, T data, CancellationToken cToken) where T : class
     {
         if (!cToken.IsCancellationRequested)
             try
@@ -245,7 +250,7 @@ public sealed class TelegramBotClient(
             }
             catch (UserInvalidOperationException exception)
             {
-                await SendMessage(new(chat, new(exception.Message)), cToken);
+                await SendText(new(message, new(exception.Message)), cToken);
                 return;
             }
             catch

@@ -1,4 +1,5 @@
-﻿using Net.Shared.Bots.Abstractions.Models.Response;
+﻿using Net.Shared.Bots.Abstractions.Models.Bot;
+using Net.Shared.Bots.Abstractions.Models.Response;
 
 namespace Net.Shared.Bots.Abstractions.Interfaces;
 
@@ -12,9 +13,7 @@ public interface IBotClient
 
     Task<byte[]> LoadFile(string fileId, CancellationToken cToken);
     
-    Task SendButtons(ButtonsEventArgs args, CancellationToken cToken);
-    Task SendWebApp(WebAppEventArgs args, CancellationToken cToken);
-    Task SendMessage(MessageEventArgs args, CancellationToken cToken);
-    Task SendMessage(string chatId, Message message, CancellationToken cToken);
-    Task SendButtons(string chatId, Buttons buttons, CancellationToken cToken);
+    Task<Result> SendText(TextEventArgs args, CancellationToken cToken);
+    Task<Result> SendButtons(ButtonsEventArgs args, CancellationToken cToken);
+    Task<Result> SendWebApp(WebAppEventArgs args, CancellationToken cToken);
 }

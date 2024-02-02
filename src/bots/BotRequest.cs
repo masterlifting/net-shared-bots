@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Options;
 
 using Net.Shared.Bots.Abstractions.Interfaces;
+using Net.Shared.Bots.Abstractions.Models.Bot;
 using Net.Shared.Bots.Abstractions.Models.Request;
 using Net.Shared.Bots.Abstractions.Models.Settings;
 
@@ -44,31 +45,33 @@ internal sealed class BotRequest(
                 }
             }
 
-            var command = new Abstractions.Models.Bot.Command(Guid.NewGuid(), commandName, commandParameters);
+            var command = new Command(Guid.NewGuid(), commandName, commandParameters);
 
-            await _botResponse.Create(args.Chat, command, cToken);
+            await _botResponse.Create(args.Message, command, cToken);
 
         }
         else if (args.Text.Value.StartsWith('\"') && args.Text.Value.EndsWith('\"'))
         {
             var commandName = Commands.Ask;
 
-            var text = $"ChatId: {args.Chat.Id}, Message: {args.Text.Value.Trim('\"')}";
+            var text = $"ChatId: {args.Message.Chat.Id}, Message: {args.Text.Value.Trim('\"')}";
 
             var commandParameters = new Dictionary<string, string>
             {
                 { CommandParameters.Message, text }
             };
 
-            var command = new Abstractions.Models.Bot.Command(Guid.NewGuid(), commandName, commandParameters);   
+            var command = new Command(Guid.NewGuid(), commandName, commandParameters);   
 
-            await _botResponse.Create(_settings.AdminId, command, cToken);
+            var message = new Message(null,new(_settings.AdminId));
+            
+            await _botResponse.Create(message, command, cToken);
         }
         else if (Guid.TryParse(args.Text.Value, out var guid))
         {
-            var command = await _botCommandsStore.Get(args.Chat.Id, guid, cToken);
+            var command = await _botCommandsStore.Get(args.Message.Chat.Id, guid, cToken);
 
-            await _botResponse.Create(args.Chat, command, cToken);
+            await _botResponse.Create(args.Message, command, cToken);
         }
         else
             throw new NotSupportedException($"The message '{args.Text.Value}' is not supported.");

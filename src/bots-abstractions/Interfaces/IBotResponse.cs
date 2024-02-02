@@ -4,6 +4,5 @@ namespace Net.Shared.Bots.Abstractions.Interfaces;
 
 public interface IBotResponse
 {
-    Task Create(Chat chat, Command command, CancellationToken cToken);
-    Task Create(string chatId, Command command, CancellationToken cToken);
+    Task Create(Message message, Command command, CancellationToken cToken);
 }

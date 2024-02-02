@@ -1,4 +1,5 @@
-﻿using Net.Shared.Bots.Abstractions.Models.Request;
+﻿using Net.Shared.Bots.Abstractions.Models.Bot;
+using Net.Shared.Bots.Abstractions.Models.Request;
 
 namespace Net.Shared.Bots.Abstractions.Interfaces;
 

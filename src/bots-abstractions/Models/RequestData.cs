@@ -1,6 +1,5 @@
 ﻿namespace Net.Shared.Bots.Abstractions.Models.Request;
 
-public sealed record Text(string Value);
 public sealed record Photo(string FileId, long? FileSize);
 public sealed record Audio(string FileId, long? FileSize, string? Title, string? MimeType);
 public sealed record Video(string FileId, long? FileSize, string? FileName, string? MimeType);
