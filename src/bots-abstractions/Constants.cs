@@ -14,4 +14,20 @@ public static class Constants
         public const string ChatId = "chatId";
         public const string Message = "message";
     }
+
+    public enum ResponseMessageBehavior
+    {
+        New,
+        Replace,
+        Reply
+    }
+
+    public enum ResponseButtonsColumns
+    {
+        Auto,
+        One = 1,
+        Two = 2,
+        Three = 3,
+        Four = 4
+    }
 }

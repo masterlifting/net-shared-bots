@@ -1,7 +1,21 @@
-﻿namespace Net.Shared.Bots.Abstractions.Models.Bot;
+﻿using static Net.Shared.Bots.Abstractions.Constants;
+
+namespace Net.Shared.Bots.Abstractions.Models.Bot;
 
 public sealed record Chat(string Id);
-public sealed record Message(int? Id, Chat Chat);
+public sealed record Message
+{
+    public ResponseMessageBehavior ResponseBehavior { get; set; } = ResponseMessageBehavior.New;
+
+    public Message(int? id, Chat chat)
+    {
+        Id = id;
+        Chat = chat;
+    }
+
+    public int? Id { get; }
+    public Chat Chat { get; }
+}
 
 public sealed record Text(string Value);
 public sealed record TextEventArgs(Message Message, Text Text);

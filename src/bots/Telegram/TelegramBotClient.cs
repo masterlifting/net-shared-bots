@@ -19,6 +19,8 @@ using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.ReplyMarkups;
 
+using static Net.Shared.Bots.Abstractions.Constants;
+
 using ExternalTelegramBotClient = Telegram.Bot.TelegramBotClient;
 using Message = Telegram.Bot.Types.Message;
 
@@ -66,32 +68,61 @@ public sealed class TelegramBotClient(
 
     public async Task<Result> SendText(TextEventArgs args, CancellationToken cToken)
     {
-        var response = args.Message.Id.HasValue
-            ? await _client.SendTextMessageAsync(args.Message.Chat.Id, args.Text.Value, replyToMessageId: args.Message.Id.Value, cancellationToken: cToken)
-            : await _client.SendTextMessageAsync(args.Message.Chat.Id, args.Text.Value, cancellationToken: cToken);
+        Message response;
+        switch (args.Message.ResponseBehavior)
+        {
+            case ResponseMessageBehavior.New:
+                response = await _client.SendTextMessageAsync(args.Message.Chat.Id, args.Text.Value, cancellationToken: cToken);
+                break;
+            case ResponseMessageBehavior.Replace:
+                if (args.Message.Id.HasValue)
+                    await _client.DeleteMessageAsync(new ChatId(args.Message.Chat.Id), args.Message.Id.Value, cToken);
+                else
+                    throw new InvalidOperationException("Message id is required for replace behavior.");
+                response = await _client.SendTextMessageAsync(args.Message.Chat.Id, args.Text.Value, cancellationToken: cToken);
+                break;
+            case ResponseMessageBehavior.Reply:
+                response = await _client.SendTextMessageAsync(args.Message.Chat.Id, args.Text.Value, replyToMessageId: args.Message.Id, cancellationToken: cToken);
+                break;
+            default:
+                throw new NotSupportedException($"Response message behavior {args.Message.ResponseBehavior} is not supported.");
+        }
 
         return new(new(response.MessageId, new(args.Message.Chat.Id)));
-
     }
     public async Task<Result> SendButtons(ButtonsEventArgs args, CancellationToken cToken)
     {
-        var columnsCount = args.Buttons.Columns != 0
-            ? args.Buttons.Columns
-            : args.Buttons.Data.Count % 4 == 0
-                ? 4
-                : args.Buttons.Data.Count % 3 == 0
-                    ? 3
-                    : args.Buttons.Data.Count % 2 == 0
-                        ? 2
-                        : 1;
+        var columnsCount = args.Buttons.Columns != ResponseButtonsColumns.Auto
+            ? (int)args.Buttons.Columns
+            : args.Buttons.Data.Count % 3 == 0
+                ? 3
+                : args.Buttons.Data.Count % 2 == 0
+                    ? 2
+                    : 1;
 
         var buttonsByColumns = CreateByColumns(columnsCount, args.Buttons.Data);
 
         var request = new InlineKeyboardMarkup(buttonsByColumns);
 
-        var response = args.Message.Id.HasValue
-            ? await _client.SendTextMessageAsync(args.Message.Chat.Id, args.Buttons.Name, replyToMessageId: args.Message.Id.Value, replyMarkup: request, cancellationToken: cToken)
-            : await _client.SendTextMessageAsync(args.Message.Chat.Id, args.Buttons.Name, replyMarkup: request, cancellationToken: cToken);
+        Message response;
+        switch (args.Message.ResponseBehavior)
+        {
+            case ResponseMessageBehavior.New:
+                response = await _client.SendTextMessageAsync(args.Message.Chat.Id, args.Buttons.Name, replyMarkup: request, cancellationToken: cToken);
+                break;
+            case ResponseMessageBehavior.Replace:
+                if (args.Message.Id.HasValue)
+                    await _client.DeleteMessageAsync(new ChatId(args.Message.Chat.Id), args.Message.Id.Value, cToken);
+                else
+                    throw new InvalidOperationException("Message id is required for replace behavior.");
+                response = await _client.SendTextMessageAsync(args.Message.Chat.Id, args.Buttons.Name, replyMarkup: request, cancellationToken: cToken);
+                break;
+            case ResponseMessageBehavior.Reply:
+                response = await _client.SendTextMessageAsync(args.Message.Chat.Id, args.Buttons.Name, replyMarkup: request, replyToMessageId: args.Message.Id, cancellationToken: cToken);
+                break;
+            default:
+                throw new NotSupportedException($"Response message behavior {args.Message.ResponseBehavior} is not supported.");
+        }
 
         return new(new(response.MessageId, new(args.Message.Chat.Id)));
 
@@ -113,23 +144,37 @@ public sealed class TelegramBotClient(
     }
     public async Task<Result> SendWebApp(WebAppEventArgs args, CancellationToken cToken)
     {
-        var columnsCount = args.WebApp.Columns != 0
-            ? args.WebApp.Columns
-            : args.WebApp.Data.Count % 4 == 0
-                ? 4
-                : args.WebApp.Data.Count % 3 == 0
-                    ? 3
-                    : args.WebApp.Data.Count % 2 == 0
-                        ? 2
-                        : 1;
+        var columnsCount = args.WebApps.Columns != ResponseButtonsColumns.Auto
+            ? (int)args.WebApps.Columns
+            : args.WebApps.Data.Count % 3 == 0
+                ? 3
+                : args.WebApps.Data.Count % 2 == 0
+                    ? 2
+                    : 1;
 
-        var buttonsByColumns = CreateByColumns(columnsCount, args.WebApp.Data);
+        var buttonsByColumns = CreateByColumns(columnsCount, args.WebApps.Data);
 
         var request = new InlineKeyboardMarkup(buttonsByColumns);
 
-        var response = args.Message.Id.HasValue
-            ? await _client.SendTextMessageAsync(args.Message.Chat.Id, args.WebApp.Name, replyToMessageId: args.Message.Id.Value, replyMarkup: request, cancellationToken: cToken)
-            : await _client.SendTextMessageAsync(args.Message.Chat.Id, args.WebApp.Name, replyMarkup: request, cancellationToken: cToken);
+        Message response;
+        switch (args.Message.ResponseBehavior)
+        {
+            case ResponseMessageBehavior.New:
+                response = await _client.SendTextMessageAsync(args.Message.Chat.Id, args.WebApps.Name, replyMarkup: request, cancellationToken: cToken);
+                break;
+            case ResponseMessageBehavior.Replace:
+                if (args.Message.Id.HasValue)
+                    await _client.DeleteMessageAsync(new ChatId(args.Message.Chat.Id), args.Message.Id.Value, cToken);
+                else
+                    throw new InvalidOperationException("Message id is required for replace behavior.");
+                response = await _client.SendTextMessageAsync(args.Message.Chat.Id, args.WebApps.Name, replyMarkup: request, cancellationToken: cToken);
+                break;
+            case ResponseMessageBehavior.Reply:
+                response = await _client.SendTextMessageAsync(args.Message.Chat.Id, args.WebApps.Name, replyMarkup: request, replyToMessageId: args.Message.Id, cancellationToken: cToken);
+                break;
+            default:
+                throw new NotSupportedException($"Response message behavior {args.Message.ResponseBehavior} is not supported.");
+        }
 
         return new(new(response.MessageId, new(args.Message.Chat.Id)));
 
@@ -218,9 +263,10 @@ public sealed class TelegramBotClient(
     }
     private Task HandleReceivedMessageError(ITelegramBotClient client, Exception exception, CancellationToken cToken)
     {
+        exception = exception.InnerException ?? exception;
+
         _log.ErrorFull(exception);
-        if (exception.InnerException is not null)
-            _log.ErrorFull(exception.InnerException);
+
         return client.SendTextMessageAsync(AdminId, exception.Message, cancellationToken: cToken);
     }
 
