@@ -63,7 +63,7 @@ internal sealed class BotRequest(
 
             var command = new Command(Guid.NewGuid(), commandName, commandParameters);   
 
-            var message = new Message(null,new(_settings.AdminId));
+            var message = new Message(args.Message.Id,new(_settings.AdminId));
             
             await _botResponse.Create(message, command, cToken);
         }

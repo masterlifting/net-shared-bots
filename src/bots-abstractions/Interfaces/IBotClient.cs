@@ -13,6 +13,7 @@ public interface IBotClient
 
     Task<byte[]> LoadFile(string fileId, CancellationToken cToken);
     
+    Task DeleteMessage(Message message, CancellationToken cToken);
     Task<Result> SendText(TextEventArgs args, CancellationToken cToken);
     Task<Result> SendButtons(ButtonsEventArgs args, CancellationToken cToken);
     Task<Result> SendWebApp(WebAppEventArgs args, CancellationToken cToken);

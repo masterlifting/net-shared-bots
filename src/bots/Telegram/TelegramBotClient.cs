@@ -66,6 +66,14 @@ public sealed class TelegramBotClient(
         return stream.ToArray();
     }
 
+    public async Task DeleteMessage(Abstractions.Models.Bot.Message message, CancellationToken cToken)
+    {
+        if (message.Id.HasValue)
+            await _client.DeleteMessageAsync(new ChatId(message.Chat.Id), message.Id.Value, cancellationToken: cToken);
+        else
+            throw new InvalidOperationException("Message id is required for delete.");
+    }
+    
     public async Task<Result> SendText(TextEventArgs args, CancellationToken cToken)
     {
         Message response;
@@ -76,13 +84,24 @@ public sealed class TelegramBotClient(
                 break;
             case ResponseMessageBehavior.Replace:
                 if (args.Message.Id.HasValue)
-                    await _client.DeleteMessageAsync(new ChatId(args.Message.Chat.Id), args.Message.Id.Value, cToken);
+                    try
+                    {
+                        await _client.DeleteMessageAsync(new ChatId(args.Message.Chat.Id), args.Message.Id.Value, cToken);
+                    }
+                    catch { }
                 else
                     throw new InvalidOperationException("Message id is required for replace behavior.");
                 response = await _client.SendTextMessageAsync(args.Message.Chat.Id, args.Text.Value, cancellationToken: cToken);
                 break;
             case ResponseMessageBehavior.Reply:
-                response = await _client.SendTextMessageAsync(args.Message.Chat.Id, args.Text.Value, replyToMessageId: args.Message.Id, cancellationToken: cToken);
+                try
+                {
+                    response = await _client.SendTextMessageAsync(args.Message.Chat.Id, args.Text.Value, replyToMessageId: args.Message.Id, cancellationToken: cToken);
+                }
+                catch
+                {
+                    response = await _client.SendTextMessageAsync(args.Message.Chat.Id, args.Text.Value, cancellationToken: cToken);
+                }
                 break;
             default:
                 throw new NotSupportedException($"Response message behavior {args.Message.ResponseBehavior} is not supported.");
@@ -112,13 +131,24 @@ public sealed class TelegramBotClient(
                 break;
             case ResponseMessageBehavior.Replace:
                 if (args.Message.Id.HasValue)
-                    await _client.DeleteMessageAsync(new ChatId(args.Message.Chat.Id), args.Message.Id.Value, cToken);
+                    try
+                    {
+                        await _client.DeleteMessageAsync(new ChatId(args.Message.Chat.Id), args.Message.Id.Value, cToken);
+                    }
+                    catch { }
                 else
                     throw new InvalidOperationException("Message id is required for replace behavior.");
                 response = await _client.SendTextMessageAsync(args.Message.Chat.Id, args.Buttons.Name, replyMarkup: request, cancellationToken: cToken);
                 break;
             case ResponseMessageBehavior.Reply:
-                response = await _client.SendTextMessageAsync(args.Message.Chat.Id, args.Buttons.Name, replyMarkup: request, replyToMessageId: args.Message.Id, cancellationToken: cToken);
+                try
+                {
+                    response = await _client.SendTextMessageAsync(args.Message.Chat.Id, args.Buttons.Name, replyMarkup: request, replyToMessageId: args.Message.Id, cancellationToken: cToken);
+                }
+                catch
+                {
+                    response = await _client.SendTextMessageAsync(args.Message.Chat.Id, args.Buttons.Name, replyMarkup: request, cancellationToken: cToken);
+                }
                 break;
             default:
                 throw new NotSupportedException($"Response message behavior {args.Message.ResponseBehavior} is not supported.");
@@ -164,13 +194,24 @@ public sealed class TelegramBotClient(
                 break;
             case ResponseMessageBehavior.Replace:
                 if (args.Message.Id.HasValue)
-                    await _client.DeleteMessageAsync(new ChatId(args.Message.Chat.Id), args.Message.Id.Value, cToken);
+                    try
+                    {
+                        await _client.DeleteMessageAsync(new ChatId(args.Message.Chat.Id), args.Message.Id.Value, cToken);
+                    }
+                    catch { }
                 else
                     throw new InvalidOperationException("Message id is required for replace behavior.");
                 response = await _client.SendTextMessageAsync(args.Message.Chat.Id, args.WebApps.Name, replyMarkup: request, cancellationToken: cToken);
                 break;
             case ResponseMessageBehavior.Reply:
-                response = await _client.SendTextMessageAsync(args.Message.Chat.Id, args.WebApps.Name, replyMarkup: request, replyToMessageId: args.Message.Id, cancellationToken: cToken);
+                try
+                {
+                    response = await _client.SendTextMessageAsync(args.Message.Chat.Id, args.WebApps.Name, replyMarkup: request, replyToMessageId: args.Message.Id, cancellationToken: cToken);
+                }
+                catch
+                {
+                    response = await _client.SendTextMessageAsync(args.Message.Chat.Id, args.WebApps.Name, replyMarkup: request, cancellationToken: cToken);
+                }
                 break;
             default:
                 throw new NotSupportedException($"Response message behavior {args.Message.ResponseBehavior} is not supported.");
