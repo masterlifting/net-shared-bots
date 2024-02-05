@@ -54,7 +54,7 @@ internal sealed class BotRequest(
         {
             var commandName = Commands.Ask;
 
-            var text = $"ChatId: {args.Message.Chat.Id}, Message: {args.Text.Value.Trim('\"')}";
+            var text = $"{CommandParameters.ChatId}={args.Message.Chat.Id}&{CommandParameters.ChatId}={args.Text.Value.Trim('\"')}";
 
             var commandParameters = new Dictionary<string, string>
             {
