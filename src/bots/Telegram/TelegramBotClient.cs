@@ -39,7 +39,6 @@ public sealed class TelegramBotClient(
 
     public async Task Listen(Uri uri, CancellationToken cToken)
     {
-        await _client.DeleteWebhookAsync(true, cToken);
         await _client.SetWebhookAsync(uri.ToString(), cancellationToken: cToken);
     }
     public async Task Listen(CancellationToken cToken)
