@@ -244,8 +244,6 @@ public sealed class TelegramBotClient(
         {
             ArgumentNullException.ThrowIfNull(update, "Received data was not recognized.");
 
-            _log.Debug(update.ToString());
-
             await using var scope = _scopeFactory.CreateAsyncScope();
 
             var request = scope.ServiceProvider.GetRequiredService<IBotRequest>();
